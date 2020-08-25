@@ -1,0 +1,622 @@
+---
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+params:
+  rundate: "190812"
+  r1: "3"
+  r2: "2"
+title: "`r glue::glue('Correlation between breeding values (region {params$r1} vs. region {params$r2})')`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(magrittr)
+library(purrr)
+library(ggplot2)
+library(tidylog)
+library(glue)
+library(rlang)
+
+source(here::here("source_functions/gather_solutions.R"))
+
+```
+
+```{r}
+round_any <- function(x, accuracy, f = round){f(x/accuracy)*accuracy}
+
+```
+
+
+```{r}
+region_key <-
+  tribble(~num, ~abbrv, ~desc,
+          2, "SE", "Southeast",
+          8, "FB", "Fescue Belt",
+          3, "HP", "High Plains", 
+          5, "AP", "Arid Prairie",
+          7, "FM", "Forested Mountains", 
+          1, "D", "Desert",
+          9, "UMWNE", "Upper Midwest & Northeast")
+```
+
+
+```{r}
+
+r1_abbrv <- 
+  region_key %>% 
+  filter(num == params$r1) %>% 
+  pull(abbrv)
+  
+r1_desc <-  
+  region_key %>% 
+  filter(num == params$r1) %>% 
+  pull(desc)
+ 
+
+r2_abbrv <- 
+  region_key %>% 
+  filter(num == params$r2) %>% 
+  pull(abbrv)
+
+
+r2_desc <-  
+  region_key %>% 
+  filter(num == params$r2) %>% 
+  pull(desc)
+
+direc <- glue("{params$rundate}_{params$r1}v{params$r2}")
+
+```
+
+
+# Import/setup
+
+```{r}
+
+sol_univ <-
+  gather_univ(
+    rundate = params$rundate,
+    r1 = params$r1,
+    r2 = params$r2, 
+    growth_trait = "ww"
+  )
+
+```
+
+
+```{r}
+
+sol_biv <-
+  gather_biv(
+    rundate = params$rundate,
+    r1 = params$r1,
+    r2 = params$r2, 
+    growth_trait = "ww"
+  )
+
+```
+
+```{r full bvs}
+
+
+sol_full <-
+read_rds(here::here("data/derived_data/animal_regions.rds")) %>%
+  filter(id_new %in% sol_biv$id_new) %>% 
+  filter(trait == "ww") %>% 
+  filter(var %in% c("bv_sol", "mat_sol")) %>% 
+  mutate(model = "full") %>% 
+  select(
+    id_new,
+    analysis_region = region, 
+    effect = var,
+    solution = value,
+    model
+         ) 
+
+
+```
+
+```{r}
+
+dat_ped <-
+  list(glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r1_abbrv}/data.{r1_abbrv}.txt"), glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r2_abbrv}/data.{r2_abbrv}.txt")) %>% 
+  set_names(params$r1, params$r2) %>% 
+  map_dfr(~ read_table2(
+    here::here(.x), 
+    col_names = c("id_new", "cg_new", "weight")
+  ),
+  .id = "region") %>% 
+  left_join(
+      list(glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r1_abbrv}/ped.{r1_abbrv}.txt"), glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r2_abbrv}/ped.{r2_abbrv}.txt")) %>% 
+        set_names(params$r1, params$r2) %>% 
+        map_dfr(~ read_table2(
+          here::here(.x), 
+          col_names = c("id_new", "sire_id", "dam_id")
+          ),
+          .id = "region")
+      )
+
+```
+
+# `r glue("Plot bivariate {r1_desc} breeding values against {r2_desc} breeding values")`
+
+## Weaning weight
+
+
+```{r plotbivww, fig.width=10, fig.height=8}
+
+lowlim <- round_any(min(sol_biv[sol_biv$effect == "bv_sol", "solution"]), 5)
+hilim <- round_any(max(sol_biv[sol_biv$effect == "bv_sol", "solution"]), 5)
+
+
+
+sol_biv %>%
+  filter(effect == "bv_sol") %>% 
+  tidyr::pivot_wider(
+    names_from = analysis_region,
+    names_prefix = "region",
+    values_from = "solution"
+    ) %>%
+  ggplot(aes(
+    x = !!sym(glue("region{params$r1}")),
+    y = !!sym(glue("region{params$r2}"))
+    )) +
+  geom_hex(aes(fill = stat(count)),
+           bins = 65) +
+  viridis::scale_fill_viridis(option = "inferno",
+                              direction = 1,
+                              begin = 0.2,
+                              labels = scales::comma
+                              ) +
+  geom_abline(slope = 1,
+              size = 1,
+              linetype = "twodash") +
+  lims(
+    x = c(lowlim, hilim),
+    y = c(lowlim, hilim)
+       ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 28,
+                              face = "italic"),
+    plot.subtitle = element_text(size = 20,
+                                 margin = margin(
+                                   t = 0,
+                                   r = 0,
+                                   b = 13,
+                                   l = 0
+                                 )),
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 14),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 16)
+  ) +
+  labs(x = glue("{r1_desc} BV"),
+       y = glue("{r2_desc} BV"),
+       fill = "Count",
+       title = glue("Estimated breeding values: {r1_desc} \nvs. {r2_desc}")
+       )
+
+```
+
+```{r plotbivww2, fig.width=10, fig.height=8}
+
+lowlim <- round_any(min(sol_biv[sol_biv$effect == "bv_sol", "solution"]), 5)
+hilim <- round_any(max(sol_biv[sol_biv$effect == "bv_sol", "solution"]), 5)
+
+dat_ped %>%
+  group_by(sire_id, region) %>%
+  tally() %>%
+  ungroup() %>%
+  tidyr::pivot_wider(
+    id_cols = "sire_id",
+    names_prefix = "n_",
+    names_from = region,
+    values_from = n
+  ) %>%
+  filter(!!sym(glue("n_{params$r1}")) >= 10) %>%
+  filter(!!sym(glue("n_{params$r2}")) >= 10) %>%
+  left_join(sol_biv %>%
+              filter(effect == "bv_sol"),
+            by = c("sire_id" = "id_new")) %>%
+  tidyr::pivot_wider(
+    id_cols = "sire_id",
+    names_prefix = "bivariate",
+    names_from = analysis_region,
+    values_from = solution
+  ) %>%
+  mutate(change = !!sym(glue("bivariate{params$r1}")) -!!sym(glue("bivariate{params$r2}"))) %>%
+  ggplot(aes(x = !!sym(glue(
+    "bivariate{params$r1}"
+  )),
+  y = !!sym(glue(
+    "bivariate{params$r2}"
+  )))) +
+  geom_point(aes(color = change), size = 3) +
+  viridis::scale_color_viridis(
+    option = "inferno",
+    direction = 1,
+    begin = 0.2,
+    labels = scales::comma
+  ) +
+  geom_abline(slope = 1,
+              size = 1,
+              linetype = "twodash") +
+  lims(x = c(lowlim, hilim),
+       y = c(lowlim, hilim)) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 28,
+                              face = "italic"),
+    plot.subtitle = element_text(size = 20,
+                                 margin = margin(
+                                   t = 0,
+                                   r = 0,
+                                   b = 13,
+                                   l = 0
+                                 )),
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 14),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 16)
+  ) +
+  labs(
+    x = glue("{r1_desc} weaning weight BV"),
+    y = glue("{r2_desc} weaning weight BV"),
+    title = glue("Estimated weaning weight breeding\nvalues: {r1_desc} vs. {r2_desc}"),
+    subtitle = "(Sires with at least 10 analyzed calves in both regions)",
+    color = "Change"
+  )
+
+
+```
+
+## Milk 
+
+```{r plotbivmilk, fig.width=10, fig.height=8}
+
+lowlim <- round_any(min(sol_biv[sol_biv$effect == "mat_sol", "solution"]), 5)
+hilim <- round_any(max(sol_biv[sol_biv$effect == "mat_sol", "solution"]), 5)
+
+sol_biv %>%
+  filter(effect == "mat_sol") %>% 
+  tidyr::pivot_wider(
+    names_from = analysis_region,
+    names_prefix = "region",
+    values_from = "solution"
+    ) %>%
+  ggplot(aes(
+    x = !!sym(glue("region{params$r1}")),
+    y = !!sym(glue("region{params$r2}"))
+    )) +
+  geom_hex(aes(fill = stat(count)),
+           bins = 65) +
+  viridis::scale_fill_viridis(option = "inferno",
+                              direction = 1,
+                              begin = 0.2,
+                              labels = scales::comma
+                              ) +
+  geom_abline(slope = 1,
+              size = 1,
+              linetype = "twodash") +
+  lims(
+    x = c(lowlim, hilim),
+    y = c(lowlim, hilim)
+       ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 28,
+                              face = "italic"),
+    plot.subtitle = element_text(size = 20,
+                                 margin = margin(
+                                   t = 0,
+                                   r = 0,
+                                   b = 13,
+                                   l = 0
+                                 )),
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 14),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 16)
+  ) +
+  labs(x = glue("{r1_desc} milk BV"),
+       y = glue("{r2_desc} milk BV"),
+       fill = "Count",
+       title = glue("Estimated milk breeding values:\n{r1_desc} vs. {r2_desc}")
+       )
+
+```
+
+```{r, fig.width=10, fig.height=8}
+
+lowlim <- round_any(min(sol_biv[sol_biv$effect == "mat_sol", "solution"]), 5)
+hilim <- round_any(max(sol_biv[sol_biv$effect == "mat_sol", "solution"]), 5)
+
+dat_ped %>%
+  group_by(sire_id, region) %>%
+  tally() %>%
+  ungroup() %>%
+  tidyr::pivot_wider(
+    id_cols = "sire_id",
+    names_prefix = "n_",
+    names_from = region,
+    values_from = n
+  ) %>%
+  filter(!!sym(glue("n_{params$r1}")) >= 10) %>%
+  filter(!!sym(glue("n_{params$r2}")) >= 10) %>%
+  left_join(sol_biv %>%
+              filter(effect == "mat_sol"),
+            by = c("sire_id" = "id_new")) %>%
+  tidyr::pivot_wider(
+    id_cols = "sire_id",
+    names_prefix = "bivariate",
+    names_from = analysis_region,
+    values_from = solution
+  ) %>%
+  mutate(change = !!sym(glue("bivariate{params$r1}")) -!!sym(glue("bivariate{params$r2}"))) %>%
+  ggplot(aes(x = !!sym(glue(
+    "bivariate{params$r1}"
+  )),
+  y = !!sym(glue(
+    "bivariate{params$r2}"
+  )))) +
+  geom_point(aes(color = change), size = 3) +
+  viridis::scale_color_viridis(
+    option = "inferno",
+    direction = 1,
+    begin = 0.2,
+    labels = scales::comma
+  ) +
+  geom_abline(slope = 1,
+              size = 1,
+              linetype = "twodash") +
+  lims(x = c(lowlim, hilim),
+       y = c(lowlim, hilim)) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 28,
+                              face = "italic"),
+    plot.subtitle = element_text(size = 20,
+                                 margin = margin(
+                                   t = 0,
+                                   r = 0,
+                                   b = 13,
+                                   l = 0
+                                 )),
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 14),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 16)
+  ) +
+  labs(
+    x = glue("{r1_desc} milk BV"),
+    y = glue("{r2_desc} milk BV"),
+    title = glue("Estimated milk breeding values:\n{r1_desc} vs. {r2_desc}"),
+    subtitle = "(Sires with at least 10 calves in both regions)",
+    color = "Change"
+  )
+
+
+```
+
+
+# Correlation between univariate and bivariate BVs
+
+```{r}
+sol_full
+```
+
+```{r}
+sol_full %>% 
+  distinct(effect)
+```
+
+
+```{r}
+
+corrs <-
+  bind_rows(sol_biv, sol_univ, sol_full %>% 
+              select(-analysis_region)) %>% 
+  filter(effect %in% c("bv_sol", "mat_sol")) %>% 
+  mutate(model = as.character(glue("{model}{analysis_region}", .na = ""))) %>% 
+  arrange(id_new) %>% 
+  tidyr::pivot_wider(id_cols = c("id_new", "effect"),
+                     names_from = model,
+                     values_from = solution) %>% 
+  select(id_new, effect, starts_with("uni"), starts_with("biv"), full)
+
+```
+
+## All animals
+
+### Weaning weight direct
+
+```{r}
+corrs %>% 
+  filter(effect == "bv_sol") %>% 
+  select(-id_new, -effect) %>% 
+  set_names(c(glue("{r1_desc} single-trait"), glue("{r2_desc} single-trait"), glue("{r1_desc} multi-trait"), glue("{r2_desc} multi-trait"), "Full run")) %>% 
+  corrr::correlate(diagonal = 1) 
+  
+
+```
+
+### Maternal milk 
+
+```{r}
+corrs %>% 
+  filter(effect == "mat_sol") %>% 
+  select(-id_new, -effect) %>% 
+  set_names(c(glue("{r1_desc} single-trait"), glue("{r2_desc} single-trait"), glue("{r1_desc} multi-trait"), glue("{r2_desc} multi-trait"), "Full run")) %>% 
+  corrr::correlate(diagonal = 1) 
+  
+
+```
+
+
+## Does correlation between breeding values change when considering only sires with calves in both regions? (n = `r dat_ped %>% group_by(sire_id, region) %>% tally() %>% filter(n_distinct(region) > 1) %>% ungroup() %>% n_distinct(.$sire_id) %>% scales::comma(.)`)
+
+### Weaning weight direct
+
+```{r}
+dat_ped %>%
+  group_by(sire_id, region) %>%
+  tally() %>% 
+  filter(n_distinct(region) > 1) %>% 
+  ungroup() %>% 
+  select(id_new = sire_id) %>% 
+  left_join(corrs) %>%
+  filter(effect == "bv_sol") %>% 
+  select(-id_new, -effect) %>% 
+  set_names(c(glue("{r1_desc} single-trait"), glue("{r2_desc} single-trait"), glue("{r1_desc} multi-trait"), glue("{r2_desc} multi-trait"), "Full run")) %>% 
+  corrr::correlate(diagonal = 1) 
+```
+
+### Maternal milk
+
+```{r}
+dat_ped %>%
+  group_by(sire_id, region) %>%
+  tally() %>% 
+  filter(n_distinct(region) > 1) %>% 
+  ungroup() %>% 
+  select(id_new = sire_id) %>% 
+  left_join(corrs) %>%
+  filter(effect == "mat_sol") %>% 
+  select(-id_new, -effect) %>% 
+  set_names(c(glue("{r1_desc} single-trait"), glue("{r2_desc} single-trait"), glue("{r1_desc} multi-trait"), glue("{r2_desc} multi-trait"), "Full run")) %>% 
+  corrr::correlate(diagonal = 1) 
+```
+
+
+---
+
+```{r, eval = FALSE}
+## ...and their own record (n = `r corrs %>% filter_all(all_vars(!is.na(.))) %>% filter(id_new %in% dat$id_new) %>% n_distinct(.$id_new) %>% scales::comma(.)`)
+corrs %>% 
+  filter_all(all_vars(!is.na(.))) %>% 
+  filter(id_new %in% dat$id_new) %>% 
+  select(-id_new) %>% 
+  set_names(c(glue("{r1_desc} single-trait"), glue("{r2_desc} single-trait"), glue("{r1_desc} multi-trait"), glue("{r2_desc} multi-trait"), "Full run")) %>% 
+  corrr::correlate(diagonal = 1) 
+```
+
+
+
+```{r, eval = FALSE}
+# Re-ranking
+bulls <-
+  bind_rows(sol_biv, sol_univ, sol_full %>%
+            select(-analysis_region)) %>%
+  filter(effect == "bv_sol") %>%
+  mutate(analysis = as.character(glue("{analysis}{analysis_region}", .na = ""))) %>%
+  arrange(id_new) %>%
+  tidyr::pivot_wider(id_cols = "id_new",
+                     names_from = analysis,
+                     values_from = solution) %>%
+  filter_all(all_vars(!is.na(.))) 
+```
+
+```{r,eval=FALSE}
+bulldiffs <-
+  dat %>% 
+  mutate(
+    region = 
+      case_when(
+        weight_2 != 0 ~ 2,
+        weight_3 != 0 ~ 3
+      )
+  ) %>% 
+  select(id_new, region) %>% 
+  left_join(ped %>% 
+              select(id_new, sire_id)) %>% 
+  group_by(sire_id, region) %>%
+  tally() %>%
+  ungroup() %>%
+  group_by(sire_id) %>%
+  filter(n_distinct(region) == 2) %>% 
+  ungroup() %>% 
+  tidyr::pivot_wider(
+    id_cols = c("sire_id"),
+    names_from = region,
+    values_from = n,
+    names_prefix = "n_"
+  ) %>% 
+  mutate(n_total = n_3 + n_2) %>% 
+  rename(id_new = sire_id) %>% 
+  left_join(bulls) %>% 
+  select(-starts_with("uni")) %>% 
+  mutate(SEvHP = bivariate2 - bivariate3,
+         HPvSE = bivariate3 - bivariate2) %>% 
+  left_join(ped %>% 
+              select(id_new, reg))
+```
+
+
+```{r,eval=FALSE}
+bulldiffs %>% 
+  filter(n_2 >= 50) %>% 
+  filter(n_3 >= 50) %>% 
+  select(reg, id_new, everything()) %>% 
+  arrange(desc(SEvHP))
+
+  
+```

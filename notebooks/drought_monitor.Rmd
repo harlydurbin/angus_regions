@@ -1,0 +1,175 @@
+---
+title: "Drought monitor"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(magrittr)
+library(purrr)
+library(ggplot2)
+library(tidylog)
+```
+
+# Notes and questions
+
+* Data from 1/1/2000 to 5/1/2019 downloaded from USDA Drought Monitor 
+    + [DSCI index](https://droughtmonitor.unl.edu/About/AbouttheData/DSCI.aspx)
+* FIPS county code/ZIP4 cross-reference file came from https://www.kaggle.com/danofer/zipcodes-county-fips-crosswalk/version/1#
+* [Grass-Cast](https://grasscast.unl.edu/)
+
+
+# Setup 
+
+```{r}
+drought
+```
+
+
+```{r}
+drought <-
+  list.files(here::here("data/raw_data/drought_monitor"), full.names = TRUE) %>%
+  purrr::map_dfr( ~ read_csv(.x)) %>%
+  select(-MapDate,-StatisticFormatID) %>%
+  distinct() %>%
+  janitor::clean_names() %>% 
+  # filter(fips %in% cg_drought$fips) %>% 
+  mutate(week = lubridate::week(valid_start),
+         year = lubridate::year(valid_start)) %>% 
+  mutate(dsci = (1*d0)+(2*d1)+(3*d2)+(4*d3)+(5*d4))
+```
+
+```{r}
+
+consec <-
+  purrr::map(.x = c("1", "2", "3", "4"),
+             function(x = .x) {
+               df <-
+                 drought %>%
+                 select(fips,
+                        state,
+                        week,
+                        year,
+                        contains("valid"),
+                        dsci,
+                        # rename drought percentage column to dx
+                        dx := !!rlang::sym(glue::glue("d{x}"))) %>%
+                 # If at least 50% of the county is in drought at the x severity
+                 # level, make inx column TRUE
+                 mutate(inx := if_else(dx >= 0.5, TRUE, FALSE)) %>%
+                 arrange(fips, year, week)
+               
+               # consecutive weeks in drought column based on fips and inx column
+               df <-
+                 transform(df, consecutivex = ave(inx, data.table::rleid(fips, inx), FUN = seq_along))
+               
+               df <-
+                 df %>%
+                 mutate(consecutivex = if_else(inx == FALSE, 0, as.double(consecutivex))) %>%
+                 rename(
+                   # Rename drought % column
+                   !!rlang::sym(glue::glue("d{x}")) := dx,
+                   # Rename in drought column
+                   !!rlang::sym(glue::glue("in{x}")) := inx,
+                   # Rename weeks in drought column
+                   !!rlang::sym(glue::glue("c{x}")) := consecutivex
+                 )
+               
+               return(df)
+             }) %>%
+  reduce(full_join)
+
+```
+
+```{r}
+
+cg_drought <-
+  read_rds(here::here("data/derived_data/cg_regions.rds")) %>% 
+  filter(trait == "ww") %>%
+  filter(!region %in% c(4, 6)) %>% 
+  filter(n_animals >= 5) %>% 
+  filter(year >= 2000) %>% 
+  left_join(
+    read_csv(here::here(
+      "data/raw_data/ZIP-COUNTY-FIPS_2017-06.csv"
+    )) %>%
+      janitor::clean_names() %>%
+      select(zip, fips = stcountyfp) %>% 
+      mutate(zip = as.character(zip))
+  ) %>% 
+  mutate(week = lubridate::week(weigh_date)) %>% 
+  left_join(consec, by = c("fips", "week", "year")) %>% 
+  select(cg_new, weigh_date, value, contains("1"), contains("2"), contains("3"), contains("4"), dsci, n_animals, year, week, region, desc, state, fips, zip, lat, lng) %>% 
+  # This is too liberal, need to figure out something better for zip codes in more than one county 
+  group_by(cg_new) %>% 
+  filter(n() > 1) %>% 
+  arrange(desc(dsci)) %>% 
+  slice(1) %>% 
+  ungroup()
+```
+
+```{r}
+cg_drought %>% 
+  group_by(region) %>% 
+  filter(!is.na(dsci)) %>% 
+  summarise(cor(value, dsci))
+```
+
+
+# Correlate
+
+```{r}
+list(1, 2, 3, 5, 7, 8, 9) %>%
+  set_names() %>%
+  purrr::map(
+    ~ cg_drought %>%
+      filter(region == .x) %>%
+      select(value, c1, c2, c3, c4) %>%
+      corrr::correlate() %>%
+      mutate(region = .x) %>% 
+      slice(1) %>% 
+      select(-rowname, -value) %>% 
+      select(region, everything())
+  ) %>% 
+  reduce(bind_rows)
+
+
+```
+
+```{r}
+cg_drought
+```
+
+
+```{r}
+cg_drought %>% 
+  select(value, d4, c)
+```
+
+
+# Commentary 
+
+I want to use drought data to identify robust individuals.
+
+Objective: do weaning weight contemporary group solutions fall in response to drought?
+* Is there a threshold drought level when weaning weights (via contemporary group) fall?
+* If change and threshold exist, are they different between regions?
+* ...Between individuals (i.e., are certain individuals more robust to drought, be it directly or via their dam's effect etc.)?
+
+Two problems with doing that.
+* How to reduce the dimensionality of the drought dataset? I can calculate a drought severity index over a large time frame, but that sacrifices a lot of time-specific information
+* What time points in calf's life to relate drought data? Maybe a calculate severity index at a couple timepoints then fit a multi-variate model?
+
+Weekly drought data from January 1, 2000 to May, 1 2019 was downloaded from the USDA drought monitor for counties in the continental United States. FIPS county codes were then matched to breeder zip codes. In cases where a zip code resided in more than one county...
+
+* CG solution for weaning weight contemporary groups after 2000

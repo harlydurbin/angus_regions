@@ -1,0 +1,120 @@
+---
+title: "Regional weaning weight GWAS annotations: High Plains vs. Southeast vs. Fescue Belt"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+    code_folding: hide 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(rlang)
+library(glue)
+library(ggplot2)
+library(lubridate)
+library(forcats)
+library(magrittr)
+library(purrr)
+library(qvalue)
+library(tidylog)
+
+
+source(here::here("source_functions/region_key.R"))
+source(here::here("source_functions/read_snp_sol.R"))
+source(here::here("source_functions/regions_manhattan.R"))
+
+options(scipen=999)
+```
+
+# Notes & questions
+
+# Setup 
+
+* SNP solutions & p-values from 5 GWAS:
+    + Southeast, spring calving only
+    + Southeast, spring & fall calving
+    + Fescue Belt, spring calving only
+    + Fescue Belt, spring & fall calving
+    + High Plains, spring & fall calving
+
+```{r}
+analyses <- c("2_spring", "2_all", "8_spring", "8_all", "3_all")
+
+analyses_regions <- c(2, 2, 8, 8, 3)
+```
+
+
+```{r}
+
+snp_sol <-
+  purrr::map2(
+    .x = analyses_regions,
+    .y = analyses,
+    ~ read_snp_sol_ww(r1 = .x, analysis = .y)
+  ) %>%
+  reduce(bind_rows)
+
+```
+
+
+```{r}
+top_snps <-
+  snp_sol %>% 
+  group_by(analysis, effect) %>% 
+  arrange(desc(neglog10p)) %>% 
+  slice(1:100) %>% 
+  ungroup()
+  
+```
+
+
+```{r}
+
+writesnps <- 
+  function(run, eff) {
+    
+    snp_sol %>% 
+      filter(analysis == run) %>% 
+      filter(effect == eff) %>% 
+      arrange(desc(neglog10p)) %>% 
+      slice(1:100) %>% 
+      mutate(query = glue("{chr}:{pos}")) %>% 
+      select(query) %>% 
+      write_tsv(here::here(glue("data/derived_data/query.{run}.{eff}.txt")), col_names = FALSE)
+      
+  }
+
+
+```
+
+# Annotations
+
+```{r}
+snp_sol %>% 
+  filter(analysis == "8_spring") %>% 
+  filter(effect == "maternal") %>% .
+  filter(chr == 9) %>% 
+  arrange(pval) %>% 
+  select(neglog10p, snp_effect, pos, everything()) %>% 
+  View()
+```
+
+
+
+```{r}
+purrr::map2(
+  .x = c("2_spring", "8_spring", "8_spring", "2_all", "8_all", "2_all", "3_all"),
+  .y = c("maternal", "maternal", "direct", "maternal", "maternal", "direct", "direct"), 
+  ~ writesnps(run = .x,
+              eff = .y)
+)
+```
+
+# Commentary

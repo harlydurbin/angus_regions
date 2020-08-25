@@ -1,0 +1,97 @@
+---
+title: "Untitled"
+author: "Harly Durbin"
+date: "9/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+library(magrittr)
+library(glue)
+library(tidylog)
+
+source(here::here("source_functions/sample_until.R"))
+source(here::here("source_functions/sample_group.R"))
+source(here::here("source_functions/three_gen.R"))
+
+region_key <-
+  tribble(~num, ~abbrv, ~desc,
+          2, "SE", "Southeast",
+          8, "FB", "Fescue Belt",
+          3, "HP", "High Plains", 
+          5, "AP", "Arid Prairie",
+          7, "FM", "Forested Mountains", 
+          1, "D", "Desert",
+          9, "UMWNE", "Upper Midwest & Northeast")
+
+```
+
+# Setup
+
+```{r}
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+ped <- read_rds(here::here("data/derived_data/ped.rds"))
+```
+
+```{r}
+start <-
+  animal_regions %>%
+  # Only weaning weights
+  filter(trait == "ww") %>%
+  filter(var == "weight") %>%
+  filter(region %in% c(1, 2, 3, 5, 7, 8, 9)) %>%
+  left_join(ped) %>%
+  # Keep only contemporary groups with 15 or more animals
+  filter(n_animals >= 15) %>%
+  group_by(cg_new) %>%
+  # Remove single sire single dam contemporary groups
+  filter(n_distinct(sire_id) > 1) %>%
+  filter(n_distinct(dam_id) > 1) %>%
+  ungroup() %>%
+  group_by(zip) %>%
+  # At least 10 years of data
+  filter(n_distinct(year) >= 10) %>%
+  ungroup()
+```
+
+
+```{r}
+start3 <-
+start %>% 
+  filter(region == 3)
+```
+
+```{r}
+start3 %>% 
+  group_by(sire_id) %>% 
+  summarise(n_calves = n(),
+            n_zips = n_distinct(zip)) %>% 
+  arrange(desc(n_calves)) %>% 
+  filter(n_zips >= 2)
+```
+
+```{r}
+
+test <-
+  start3 %>% 
+  filter(sire_id == 852316) %>% 
+  group_by(zip) %>% 
+  tally(sort = TRUE) %>% 
+  slice(1:20)
+
+
+start3 %>% 
+  filter(zip %in% test$zip) %>% 
+  group_by(sire_id) %>% 
+  tally(sort = TRUE) %>% 
+  filter(n >= 100)
+```
+
+

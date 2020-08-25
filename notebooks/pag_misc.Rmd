@@ -1,0 +1,131 @@
+---
+title: "PAG misc."
+author: "Harly Durbin"
+date: "1/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(glue)
+library(stringr)
+library(magrittr)
+library(tibble)
+library(purrr)
+library(ggplot2)
+library(rlang)
+library(tidylog)
+
+source(here::here("source_functions/region_key.R"))
+```
+
+# Setup
+
+```{r}
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+```
+
+
+# Calving season plot
+
+```{r, fig.width=12, fig.height=7}
+
+dummykey <-
+  tribble(~ xpoint, ~ words,
+          lubridate::ymd("2019-06-30"), "Cut-off for fall & spring calving"
+          )
+
+cg_regions %>% 
+  filter(var == "cg_sol") %>% 
+  filter(trait == "ww") %>% 
+  mutate(birth_date = weigh_date - 205,
+         birth_week = lubridate::week(birth_date)
+         # Probably a more elegant way to do this
+         #dummy_birth = str_remove(as.character(birth_date), "^[[:digit:]]{4}"),
+         #dummy_birth = lubridate::ymd(glue("2019{dummy_birth}"))
+         ) %>% 
+  group_by(region) %>% 
+  mutate(total = sum(n_animals)) %>% 
+  ungroup() %>% 
+  group_by(region, total, birth_week) %>% 
+  summarise(n_born = sum(n_animals)) %>% 
+  ungroup() %>% 
+  filter(birth_week != 53) %>% 
+  mutate(percent_born = n_born/total,
+         #birth_week = if_else(birth_week == 53, 1, birth_week)
+         # https://stackoverflow.com/questions/32470414/convert-week-number-to-date
+         dummy_week = as.Date(glue("2019-{birth_week}-1"), "%Y-%U-%u"),
+         dummy_week = lubridate::ymd(dummy_week)-6
+         ) %>%
+  filter(region %in% c(2, 3, 8)) %>% 
+  ggplot(aes(
+    x = dummy_week,
+    y = percent_born, 
+    color = forcats::as_factor(region)
+  )) +
+  geom_line(alpha = 0.8,
+            size = 2) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_date(date_labels = "%b %d") +
+  scale_color_manual(
+    values = c(
+      "2" = "darkslategray4",
+      "3" = "springgreen3",
+      "8" = "gray17"
+    ),
+    labels = c(
+      "2" = "2: Southeast",
+      "3" = "3: High Plains",
+      "8" = "8: Fescue Belt"
+    )
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      size = 26,
+      face = "italic",
+      margin = margin(
+        t = 0,
+        r = 0,
+        b = 13,
+        l = 0
+      )
+    ),
+    axis.title = element_text(
+      size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(
+      size = 18),
+    legend.text = element_text(
+      size = 18)
+  ) +
+  labs(
+    x = NULL,
+    y = "Percentage born",
+    color = NULL,
+    linetype = NULL,
+    title = str_wrap(
+      "Calving season distribution by region",
+      width = 55
+    )
+  ) +
+  geom_vline(xintercept = lubridate::ymd("2019-06-30"), color = "red", linetype = "twodash", size = 2) +
+  annotate("text", x = lubridate::ymd("2019-06-30"), y = 0, label = "Cut-off for fall & spring calving", size = 6, angle = 90, vjust = -0.7, hjust = -0.2, color = "red")
+  
+ggsave(here::here("figures/calving_season_238.png"),width = 12, height = 7)  
+```
+

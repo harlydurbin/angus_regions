@@ -1,0 +1,317 @@
+---
+title: "Sire summary"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+params:
+  rundate: "190812"
+  r1: "3"
+  r2: "1"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(magrittr)
+library(purrr)
+library(ggplot2)
+library(tidylog)
+
+region_key <-
+  tribble(~num, ~abbrv, ~desc,
+          2, "SE", "Southeast",
+          8, "FB", "Fescue Belt",
+          3, "HP", "High Plains", 
+          5, "AP", "Arid Prairie",
+          7, "FM", "Forested Mountains", 
+          1, "D", "Desert",
+          9, "UMWNE", "Upper Midwest & Northeast")
+
+r1_abbrv <- 
+  region_key %>% 
+  filter(num == params$r1) %>% 
+  pull(abbrv)
+  
+r1_desc <-  
+  region_key %>% 
+  filter(num == params$r1) %>% 
+  pull(desc)
+ 
+
+r2_abbrv <- 
+  region_key %>% 
+  filter(num == params$r2) %>% 
+  pull(abbrv)
+
+
+r2_desc <-  
+  region_key %>% 
+  filter(num == params$r2) %>% 
+  pull(desc)
+
+direc <- glue("{params$rundate}_{params$r1}v{params$r2}")
+
+```
+
+```{r, eval=TRUE}
+source(here::here("source_functions/ped.R"))
+
+```
+
+
+# Import/Setup 
+
+```{r}
+
+dat <-
+  read_table2(here::here(
+    glue("data/f90/{direc}/data.{r1_abbrv}_{r2_abbrv}.txt")),  
+              col_names = c("id_new", "cg_new", glue("weight_{params$r1}"), glue("weight_{params$r2}")))
+
+
+```
+
+```{r, eval=TRUE}
+
+ped_biv <-
+  list( glue("data/f90/{direc}/{r1_abbrv}/ped.{r1_abbrv}.txt"),  glue("data/f90/{direc}/{r2_abbrv}/ped.{r2_abbrv}.txt")) %>% 
+  rlang::set_names(params$r1, params$r2) %>% 
+  map_dfr(~ read_table2(here::here(.x), 
+              col_names = c("id_new", "sire_id", "dam_id")),
+      .id = "region") %>% 
+filter(id_new %in% dat$id_new)
+
+
+```
+
+
+# Total sires
+
+```{r}
+ped_biv %>%
+  group_by(region) %>%
+  summarise(`n sires` = n_distinct(sire_id)) %>% 
+  rename(Region = region) %>% 
+  mutate(`n sires` = scales::comma(`n sires`))
+```
+
+## How many sires with progeny in both regions? 
+
+* `r ped_biv %>% group_by(sire_id, region) %>% tally() %>% ungroup() %>% group_by(sire_id) %>% filter(n_distinct(region) == 2) %>% ungroup() %>% distinct(sire_id) %>% nrow() %>% scales::comma()` bulls with progeny in both regions
+
+```{r}
+
+ped_biv %>%
+  group_by(sire_id, region) %>%
+  tally() %>%
+  ungroup() %>% 
+  pivot_wider(id_cols = sire_id,
+              names_from = region,
+              values_from = n, 
+              names_prefix = "region_") %>% 
+  filter(!is.na(!!sym(glue("region_{params$r1}")))) %>% 
+  filter(!is.na(!!sym(glue("region_{params$r2}")))) %>% 
+  mutate(total = !!sym(glue("region_{params$r1}")) + !!sym(glue("region_{params$r2}"))) %>% 
+  arrange(desc(total))# %>% 
+  # DT::datatable(options = list(pageLength = 10), rownames = FALSE, caption = "Sires with calves in both regions")
+
+
+```
+
+
+```{r, fig.width=7, fig.height=8}
+
+bullsboth <- ped_biv %>% group_by(sire_id, region) %>% tally() %>% ungroup() %>% group_by(sire_id) %>% filter(n_distinct(region) == 2) %>% ungroup() %>% distinct(sire_id) %>% nrow()
+
+ped_biv %>%
+  group_by(sire_id, region) %>%
+  tally() %>%
+  ungroup() %>%
+  group_by(sire_id) %>%
+  filter(n_distinct(region) == 2) %>%
+  ungroup() %>% 
+  ggplot(aes(x = n,
+             fill = region)) +
+  geom_histogram(bins = 20, 
+                 show.legend = FALSE) +
+  facet_wrap( ~ region, 
+              nrow = 2, 
+             labeller = labeller(
+               region = c(
+                 "1" = "1: Desert",
+                 "2" = "2: Southeast",
+                 "3" = "3: High Plains",
+                 "4" = "4: Rainforest",
+                 "5" = "5: Arid Prairie",
+                 "6" = "6: Cold Desert",
+                 "7" = "7: Forested Mountains",
+                 "8" = "8: Fescue Belt",
+                 "9" = "9: Upper Midwest & Northeast"
+                 )
+               )
+              ) +
+  scale_fill_manual(
+    values = c(
+      "1" = "tomato2",
+      "2" = "darkslategray4",
+      "3" = "springgreen3",
+      "4" = "brown",
+      "5" = "goldenrod1",
+      "6" = "gray50",
+      "7" = "deeppink3",
+      "8" = "gray17",
+      "9" = "slateblue2"
+    )
+  ) +
+  labs(title = glue("Distribution of calves, bulls with progeny in\n both regions (n = {bullsboth})"),
+       x = "Number of calves",
+       y = "Count of bulls") +
+  theme_classic() +
+    theme(
+    plot.title = element_text(
+      size = 20,
+      face = "italic",
+      margin = margin(t = 0, r = 0, b = 13, l = 0)
+    ),
+    axis.title = element_text(
+      size = 16 
+    ),
+    axis.title.y = element_text(
+      margin = margin(t = 0, r = 13, b = 0, l = 0)
+    ),
+    axis.title.x = element_text(
+      margin = margin(t = 13, r = 0, b = 0, l = 0)
+    ),
+    axis.text = element_text(
+      size = 14
+    ),
+    legend.text = element_text(
+      size = 14
+    ),
+    strip.text.x = element_text(
+      size = 14
+    )
+  )
+
+```
+
+
+## How many paternal sires with grand-progeny in both regions? 
+
+```{r}
+
+ped3 <-
+  ped_biv %>%
+  left_join(ped_biv %>%
+              distinct(sire_id) %>%
+              left_join(
+                ped %>%
+                  select(id_new,
+                         pgs_id = sire_id,
+                         pgd_id = dam_id),
+                by = c("sire_id" = "id_new")
+              ))
+```
+
+* `r ped3 %>% group_by(pgs_id, region) %>% tally() %>% ungroup() %>% group_by(pgs_id) %>% filter(n_distinct(region) == 2) %>% ungroup() %>% distinct(pgs_id) %>% nrow() %>% scales::comma()` bulls with grand-progeny in both regions
+
+```{r}
+ped3 %>% 
+  group_by(pgs_id, region) %>% 
+  tally() %>%
+  ungroup() %>% 
+  pivot_wider(id_cols = pgs_id,
+              names_from = region,
+              values_from = n, 
+              names_prefix = "region_") %>% 
+  mutate(total = !!sym(glue("region_{params$r1}")) + !!sym(glue("region_{params$r2}"))) %>% 
+  filter(!is.na(total)) %>% 
+  arrange(desc(total)) %>% 
+  DT::datatable(options = list(pageLength = 10), rownames = FALSE, caption = "PGS with grand-progeny in both regions")
+
+  
+```
+
+```{r, fig.width=7, fig.height=8}
+
+pgsboth <- ped3 %>% group_by(pgs_id, region) %>% tally() %>% ungroup() %>% group_by(pgs_id) %>% filter(n_distinct(region) == 2) %>% ungroup() %>% distinct(pgs_id) %>% nrow()
+
+ped3 %>%
+  group_by(pgs_id, region) %>%
+  tally() %>%
+  ungroup() %>%
+  group_by(pgs_id) %>%
+  filter(n_distinct(region) == 2) %>%
+  ungroup() %>% 
+  ggplot(aes(x = n,
+             fill = region)) +
+  geom_histogram(bins = 20, 
+                 show.legend = FALSE) +
+  facet_wrap( ~ region, 
+              nrow = 2, 
+             labeller = labeller(
+               region = c(
+                 "1" = "1: Desert",
+                 "2" = "2: Southeast",
+                 "3" = "3: High Plains",
+                 "4" = "4: Rainforest",
+                 "5" = "5: Arid Prairie",
+                 "6" = "6: Cold Desert",
+                 "7" = "7: Forested Mountains",
+                 "8" = "8: Fescue Belt",
+                 "9" = "9: Upper Midwest & Northeast"
+                 )
+               )
+              ) +
+  scale_fill_manual(
+    values = c(
+      "1" = "tomato2",
+      "2" = "darkslategray4",
+      "3" = "springgreen3",
+      "4" = "brown",
+      "5" = "goldenrod1",
+      "6" = "gray50",
+      "7" = "deeppink3",
+      "8" = "gray17",
+      "9" = "slateblue2"
+    )
+  ) +
+  labs(title = glue("Distribution of grand-progeny (PGSs with\n progeny in both regions, n = {pgsboth})"),
+       x = "Number of calves",
+       y = "Count of bulls") +
+  theme_classic() +
+    theme(
+    plot.title = element_text(
+      size = 20,
+      face = "italic",
+      margin = margin(t = 0, r = 0, b = 13, l = 0)
+    ),
+    axis.title = element_text(
+      size = 16 
+    ),
+    axis.title.y = element_text(
+      margin = margin(t = 0, r = 13, b = 0, l = 0)
+    ),
+    axis.title.x = element_text(
+      margin = margin(t = 13, r = 0, b = 0, l = 0)
+    ),
+    axis.text = element_text(
+      size = 14
+    ),
+    legend.text = element_text(
+      size = 14
+    ),
+    strip.text.x = element_text(
+      size = 14
+    )
+  )
+```
+

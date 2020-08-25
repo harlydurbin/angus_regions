@@ -1,0 +1,650 @@
+---
+title: "Scrambled control bivariate models"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(magrittr)
+library(purrr)
+library(ggplot2)
+library(rlang)
+library(tidylog)
+
+source(here::here("source_functions/sample_group.R"))
+source(here::here("source_functions/three_gen.R"))
+source(here::here("source_functions/parse_aireml.R"))
+source(here::here("source_functions/biv_heritability.R"))
+```
+
+```{r}
+region_key <-
+  tribble(~num, ~abbrv, ~desc,
+          2, "SE", "Southeast",
+          8, "FB", "Fescue Belt",
+          3, "HP", "High Plains", 
+          5, "AP", "Arid Prairie",
+          7, "FM", "Forested Mountains", 
+          1, "D", "Desert",
+          9, "UMWNE", "Upper Midwest & Northeast")
+```
+
+```{r, eval = FALSE}
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+```
+
+```{r, eval = FALSE}
+ped <- read_rds(here::here("data/derived_data/ped.rds"))
+```
+
+```{r, eval = FALSE}
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+```
+
+```{r, eval = FALSE}
+source(here::here("source_functions/datuniv_ped.R"))
+```
+
+# Notes
+
+* 8/26/19: Am I picking up family structure by sampling by zip code?
+    + Jerry: "Need to check genomic relatedness. Expect average relatedness among animals to high higher within regions than between regions if local adaptation is happening."
+        - But is this contrary to what Jared said? "The overall population is panmictic, but the effect of QTL are different between zones." But dosen't this go against the assumptions of Troy's selection scans?
+
+# Setup
+
+## Scramble from region 3, by zip code
+
+### Randomly assign animals from region 3
+
+```{r, eval = FALSE}
+
+scramble_3 <-
+  datuniv_ped %>% 
+  filter(region %in% c(3)) %>% 
+  left_join(
+    cg_regions %>% 
+      filter(trait == "ww") %>% 
+      select(year, cg_new, zip) %>% 
+      distinct()
+    ) %>% 
+  sample_group(zip, 2)
+
+scramble_3 %>% 
+  group_by(k) %>% 
+  tally()
+```
+
+
+### Write out data
+
+```{r, eval = FALSE}
+scramble_3 %>% 
+  select(id_new, cg_new, weight, k) %>% 
+  spread(k, weight) %>% 
+  mutate_all( ~ replace_na(., "0")) %>% 
+  arrange(`1`) %>% 
+      write_delim(
+        here::here("data/f90/scramble_3/data.scramble_3.txt"),
+        delim = " ",
+        col_names = FALSE
+      )
+
+```
+
+```{r, eval = FALSE}
+scramble_3 %>% 
+  select(id_new, sire_id, dam_id) %>% 
+  three_gen(full_ped = ped) %>% 
+  write_delim(
+    path = here::here("data/f90/scramble_3/ped.scramble_3.txt"),
+    delim = " ",
+    col_names = FALSE
+  )
+
+```
+
+
+```{r, eval = FALSE}
+
+file.copy(from = here::here("data/f90/190812_3v8/HP_FB.par"), to = here::here("data/f90/scramble_3"), recursive = FALSE, copy.mode = TRUE)
+file.rename(here::here(glue("data/f90/scramble_3/HP_FB.par")), here::here(glue("data/f90/scramble_3/scramble_3.par")))
+
+
+```
+
+## Scramble from High Plains & Fescue Belt, by zip code
+
+### Randomly assign animals used in **High Plains vs. Fescue Belt** bivariate analyses to two groups based on zip code
+
+```{r, eval = FALSE}
+scramble_hpfb <-
+  datuniv_ped %>% 
+  filter(region %in% c(3, 8)) %>% 
+  left_join(
+    cg_regions %>% 
+      filter(trait == "ww") %>% 
+      select(year, cg_new, zip) %>% 
+      distinct()
+    ) %>% 
+  sample_group(zip, 2)
+```
+
+```{r, eval = FALSE}
+scramble_hpfb %>% 
+  group_by(k, region) %>% 
+  tally()
+```
+
+### Write out data
+
+```{r, eval = FALSE}
+scramble_hpfb %>% 
+  select(id_new, cg_new, weight, k) %>% 
+  spread(k, weight) %>% 
+  mutate_all( ~ replace_na(., "0")) %>% 
+  arrange(`1`) %>% 
+      write_delim(
+        here::here(glue("data/f90/scramble_hpfb/data.scramble_hpfb.txt")),
+        delim = " ",
+        col_names = FALSE
+      )
+```
+
+```{r, eval = FALSE}
+
+file.copy(from = here::here("data/f90/190819_3v8/HP_FB.par"), to = here::here("data/f90/scramble_hpfb"), recursive = FALSE, copy.mode = TRUE)
+file.rename(here::here(glue("data/f90/scramble_hpfb/HP_FB.par")), here::here(glue("data/f90/scramble_hpfb/scramble_hpfb.par")))
+
+file.copy(from = here::here("data/f90/190819_3v8/ped.HP_FB.txt"), to = here::here("data/f90/scramble_hpfb"), recursive = FALSE, copy.mode = TRUE)
+file.rename(here::here(glue("data/f90/scramble_hpfb/ped.HP_FB.txt")), here::here(glue("data/f90/scramble_hpfb/ped.scramble_hpfb.txt")))
+
+
+```
+
+## Scramble from all regions, by zip code
+
+### Randomly assign animals from all region analyses
+
+```{r, eval = FALSE}
+scramble_all <-
+datuniv_ped %>% 
+  left_join(
+    cg_regions %>% 
+      filter(trait == "ww") %>% 
+      select(year, cg_new, zip) %>% 
+      distinct()
+    ) %>% 
+  sample_group_until(var = zip, per_k = 100000)
+```
+
+
+```{r, eval = FALSE}
+scramble_all %>% 
+  group_by(k) %>% 
+  summarise(n_regions = n_distinct(region), 
+            n_zips = n_distinct(zip), 
+            n_animals = n())
+```
+
+```{r, eval = FALSE}
+
+scramble_all %>% 
+  group_by(k, region) %>% 
+  summarise( 
+            n_zips = n_distinct(zip), 
+            n_animals = n())
+
+```
+
+### Write out data
+
+```{r, eval = FALSE}
+scramble_all %>% 
+  select(id_new, cg_new, weight, k) %>% 
+  spread(k, weight) %>% 
+  mutate_all( ~ replace_na(., "0")) %>% 
+  arrange(`1`) %>% 
+      write_delim(
+        here::here("data/f90/scramble_all/data.scramble_all.txt"),
+        delim = " ",
+        col_names = FALSE
+      )
+
+```
+
+```{r, eval = FALSE}
+scramble_all %>% 
+  select(id_new, sire_id, dam_id) %>% 
+  three_gen(full_ped = ped) %>% 
+  write_delim(
+    path = here::here("data/f90/scramble_all/ped.scramble_all.txt"),
+    delim = " ",
+    col_names = FALSE
+  )
+
+```
+
+
+```{r, eval = FALSE}
+
+file.copy(from = here::here("data/f90/190812_3v8/HP_FB.par"), to = here::here("data/f90/scramble_all"), recursive = FALSE, copy.mode = TRUE)
+file.rename(here::here(glue("data/f90/scramble_all/HP_FB.par")), here::here(glue("data/f90/scramble_all/scramble_all.par")))
+
+
+```
+
+
+## Scramble from all regions, by zip code
+
+### Randomly assign animals from all region analyses
+
+```{r, eval = FALSE}
+scramble_all <-
+datuniv_ped %>% 
+  left_join(
+    cg_regions %>% 
+      filter(trait == "ww") %>% 
+      select(year, cg_new, zip) %>% 
+      distinct()
+    ) %>% 
+  sample_group_until(var = zip, per_k = 100000)
+```
+
+
+```{r, eval = FALSE}
+scramble_all %>% 
+  group_by(k) %>% 
+  summarise(n_regions = n_distinct(region), 
+            n_zips = n_distinct(zip), 
+            n_animals = n())
+```
+
+```{r, eval = FALSE}
+
+scramble_all %>% 
+  group_by(k, region) %>% 
+  summarise( 
+            n_zips = n_distinct(zip), 
+            n_animals = n())
+
+```
+
+### Write out data
+
+```{r, eval = FALSE}
+scramble_all %>% 
+  select(id_new, cg_new, weight, k) %>% 
+  spread(k, weight) %>% 
+  mutate_all( ~ replace_na(., "0")) %>% 
+  arrange(`1`) %>% 
+      write_delim(
+        here::here("data/f90/scramble_all/data.scramble_all.txt"),
+        delim = " ",
+        col_names = FALSE
+      )
+
+```
+
+```{r, eval = FALSE}
+scramble_all %>% 
+  select(id_new, sire_id, dam_id) %>% 
+  three_gen(full_ped = ped) %>% 
+  write_delim(
+    path = here::here("data/f90/scramble_all/ped.scramble_all.txt"),
+    delim = " ",
+    col_names = FALSE
+  )
+
+```
+
+
+```{r, eval = FALSE}
+
+file.copy(from = here::here("data/f90/190812_3v8/HP_FB.par"), to = here::here("data/f90/scramble_all"), recursive = FALSE, copy.mode = TRUE)
+file.rename(here::here(glue("data/f90/scramble_all/HP_FB.par")), here::here(glue("data/f90/scramble_all/scramble_all.par")))
+
+
+```
+
+## Scramble from all regions, by contemporary group
+
+### Randomly assign animals from all region analyses
+
+```{r, eval = FALSE}
+scramble_all_cg <-
+datuniv_ped %>% 
+  left_join(
+    cg_regions %>% 
+      filter(trait == "ww") %>% 
+      select(year, cg_new, zip) %>% 
+      distinct()
+    ) %>% 
+  sample_group_until(var = cg_new, per_k = 100000)
+```
+
+
+```{r, eval = FALSE}
+scramble_all_cg %>% 
+  group_by(k) %>% 
+  summarise(n_regions = n_distinct(region), 
+            n_zips = n_distinct(zip), 
+            n_cgs = n_distinct(cg_new),
+            n_animals = n())
+```
+
+* Jared: "Check that you don't have any repeated dams in your random sample" 
+
+```{r, eval = FALSE}
+
+scramble_all_cg %>% 
+  group_by(dam_id) %>% 
+  filter(n() > 1) %>% 
+  arrange(dam_id)
+```
+
+```{r}
+
+scramble_all_cg %>% 
+  group_by(dam_id) %>% 
+  summarise(n = n()) %>%
+  ungroup() %>% 
+  filter(n > 1) %>% 
+  arrange(desc(n))
+  
+```
+
+### Write out data
+
+```{r, eval = FALSE}
+scramble_all_cg %>% 
+  select(id_new, cg_new, weight, k) %>% 
+  spread(k, weight) %>% 
+  mutate_all( ~ replace_na(., "0")) %>% 
+  arrange(`1`) %>% 
+      write_delim(
+        here::here("data/f90/scramble_all_cg/data.scramble_all_cg.txt"),
+        delim = " ",
+        col_names = FALSE
+      )
+
+```
+
+```{r, eval = FALSE}
+scramble_all_cg %>% 
+  select(id_new, sire_id, dam_id) %>% 
+  three_gen(full_ped = ped) %>% 
+  write_delim(
+    path = here::here("data/f90/scramble_all_cg/ped.scramble_all_cg.txt"),
+    delim = " ",
+    col_names = FALSE
+  )
+
+```
+
+
+```{r, eval = FALSE}
+
+file.copy(from = here::here("data/f90/190812_3v8/HP_FB.par"), to = here::here("data/f90/scramble_all_cg"), recursive = FALSE, copy.mode = TRUE)
+file.rename(here::here(glue("data/f90/scramble_all_cg/HP_FB.par")), here::here(glue("data/f90/scramble_all_cg/scramble_all_cg.par")))
+
+
+```
+
+## Scramble from full dataset, by contemporary group
+
+### Randomly assign animals from all region analyses
+
+```{r, eval = FALSE}
+
+scramble_full_cg <-
+  animal_regions %>%
+  # Only weaning weights
+  filter(trait == "ww") %>%
+  filter(var == "weight") %>%
+  filter(region %in%  c(1, 2, 3, 5, 7, 8, 9)) %>%
+  left_join(ped %>% 
+              select(1:3)) %>%
+  # Keep only contemporary groups with 15 or more animals
+  filter(n_animals >= 15) %>%
+  group_by(cg_new) %>%
+  # Remove single sire single dam contemporary groups
+  filter(n_distinct(sire_id) > 1) %>%
+  filter(n_distinct(dam_id) > 1) %>%
+  ungroup() %>%
+  group_by(zip) %>%
+  # At least 10 years of data
+  filter(n_distinct(year) >= 10) %>%
+  ungroup() %>% 
+  mutate(
+    helper = 
+      case_when(
+        herd_state %in% c("CA", "OR", "ID", "WA") & region == 9 ~ "drop",
+        TRUE ~ "keep"
+      )) %>% 
+  filter(helper == "keep") %>% 
+  sample_group_until(var = cg_new, per_k = 100000)
+
+```
+
+
+```{r, eval = FALSE}
+scramble_full_cg %>% 
+  group_by(k) %>% 
+  summarise(n_regions = n_distinct(region), 
+            n_zips = n_distinct(zip), 
+            n_cgs = n_distinct(cg_new),
+            n_animals = n()) 
+```
+
+* Jared: "Check that you don't have any repeated dams in your random sample" 
+
+```{r, eval = FALSE}
+
+scramble_full_cg %>% 
+  group_by(dam_id) %>% 
+  filter(n() > 1) %>% 
+  arrange(dam_id)
+```
+
+```{r}
+
+scramble_full_cg %>% 
+  group_by(dam_id) %>% 
+  summarise(n = n()) %>%
+  ungroup() %>% 
+  filter(n > 1) %>% 
+  arrange(desc(n))
+  
+```
+
+### Write out data
+
+```{r, eval = FALSE}
+scramble_full_cg %>% 
+  select(id_new, cg_new, value, k) %>% 
+  spread(k, value) %>% 
+  mutate_all( ~ replace_na(., "0")) %>% 
+  arrange(`1`) %>% 
+      write_delim(
+        here::here("data/f90/scramble_full_cg/data.scramble_full_cg.txt"),
+        delim = " ",
+        col_names = FALSE
+      )
+
+```
+
+```{r, eval = FALSE}
+scramble_full_cg %>% 
+  select(id_new, sire_id, dam_id) %>% 
+  three_gen(full_ped = ped) %>% 
+  write_delim(
+    path = here::here("data/f90/scramble_full_cg/ped.scramble_full_cg.txt"),
+    delim = " ",
+    col_names = FALSE
+  )
+
+```
+
+
+```{r, eval = FALSE}
+
+file.copy(from = here::here("data/f90/190812_3v8/HP_FB.par"), to = here::here("data/f90/scramble_full_cg"), recursive = FALSE, copy.mode = TRUE)
+file.rename(here::here(glue("data/f90/scramble_full_cg/HP_FB.par")), here::here(glue("data/f90/scramble_full_cg/scramble_full_cg.par")))
+
+
+```
+
+
+
+
+# Results
+
+## Scramble region 3, by zip code
+
+* Split the zip codes from High Plains used in all bivariate runs into two groups (treat as two separate regions)
+
+### Variance components & heritabilities 
+
+```{r}
+
+parse_aireml(
+  "data/f90/scramble_3/airemlf90.scramble_3.log",
+  traits = c("scramble1", "scramble2")
+) %>%
+  biv_heritability(abbrvs = list("scramble1", "scramble2"), descs = list("Fake region 1", "Fake region 2"))
+```
+
+### Genetic correlations
+
+```{r}
+read_table2(here::here("data/f90/scramble_3/airemlf90.scramble_3.log"),
+            skip = 9,
+            n_max = 4,
+            col_names = c(glue("Fake region 1 (direct)"), glue("Fake region 2 (direct)"), glue("Fake region 1 (milk)"), glue("Fake region 2 (milk)"))) %>%
+  mutate(rowname = colnames(.)) %>% 
+  select(rowname, everything())
+```
+
+### Jared: "Compare CG solutions from splitting vs. original univariate run"
+
+```{r}
+
+compare_cg <-
+  read_table2(
+  here::here("data/f90/scramble_3/solutions"),
+  skip = 1,
+  col_names = c("region", "effect", "id_biv", "solution_scramble")
+) %>%
+  filter(effect == 4) %>% 
+  mutate(
+    region =
+      case_when(
+        region == 1 ~ "fake1",
+        region == 2 ~ "fake2"
+        ),
+    effect = "cg_sol"
+    ) %>%
+  left_join(read_table2(here::here("data/f90/scramble_3/renadd02.ped"),
+                        col_names = FALSE) %>%
+              select(id_biv = X1, id_new = X10)) %>%
+  select(-id_biv) %>% 
+  left_join(
+    read_table2(
+      here::here("data/f90/190812_3v8/HP/solutions"),
+      skip = 1,
+      col_names = c("region", "effect", "id_biv", "solution_univ")
+    ) %>%
+      filter(effect == 4) %>% 
+      mutate(effect = "cg_sol") %>% 
+      left_join(read_table2(
+        here::here("data/f90/190812_3v8/HP/renadd02.ped"),
+        col_names = FALSE
+      ) %>%
+        select(id_biv = X1, id_new = X10)) %>%
+      select(-region, -id_biv)
+  ) %>% 
+  left_join(read_table2(
+    here::here("data/f90/190812_3v8/HP/data.HP.txt"),
+    col_names = c("id_new", "cg_new", "weight")
+  ) %>%
+    left_join(read_table2(
+      here::here("data/f90/190812_3v8/HP/ped.HP.txt"),
+      col_names = c("id_new", "sire_id", "dam_id")
+    )))
+```
+
+```{r}
+compare_cg %>% 
+  filter(!is.na(weight)) %>% 
+  group_by(region) %>% 
+  summarise(cor = cor(solution_scramble, solution_univ))
+```
+
+
+## Scramble High Plains & Fescue Belt, by zip code
+
+* Randomly select zip codes from High Plains and Fescue Belt regions to create two fake regions with ~ 100,000 animals in each regio
+
+### Variance components & heritabilities
+
+```{r}
+
+parse_aireml(
+  "data/f90/scramble_hpfb/airemlf90.scramble_hpfb.log",
+  traits = c("scramble1", "scramble2")
+) %>%
+  biv_heritability(abbrvs = list("scramble1", "scramble2"), descs = list("Fake region 1", "Fake region 2"))
+```
+
+### Genetic correlations
+
+```{r}
+read_table2(here::here("data/f90/scramble_hpfb/airemlf90.scramble_hpfb.log"),
+            skip = 9,
+            n_max = 4,
+            col_names = c(glue("Fake region 1 (direct)"), glue("Fake region 2 (direct)"), glue("Fake region 1 (milk)"), glue("Fake region 2 (milk)"))) %>%
+  mutate(rowname = colnames(.)) %>% 
+  select(rowname, everything())
+```
+
+
+
+## Scramble all regions, by zip code
+
+* Randomly select zip codes from all regions to create two fake regions with ~ 100,000 animals in each region
+
+### Variance components & heritabilities 
+
+```{r}
+
+parse_aireml(
+  "data/f90/scramble_all/airemlf90.scramble_all.log",
+  traits = c("scramble1", "scramble2")
+) %>%
+  biv_heritability(abbrvs = list("scramble1", "scramble2"), descs = list("Fake region 1", "Fake region 2"))
+```
+
+### Genetic correlations
+
+```{r}
+read_table2(here::here("data/f90/scramble_all/airemlf90.scramble_all.log"),
+            skip = 9,
+            n_max = 4,
+            col_names = c(glue("Fake region 1 (direct)"), glue("Fake region 2 (direct)"), glue("Fake region 1 (milk)"), glue("Fake region 2 (milk)"))) %>%
+  mutate(rowname = colnames(.)) %>% 
+  select(rowname, everything())
+```
+
+

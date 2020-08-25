@@ -1,0 +1,11 @@
+region: ["2", "8", "3"]
+
+sample_limit: 10000
+
+master_geno: "data/raw_data/aaa50snp.dat"
+
+master_map: "data/raw_data/angus_map"
+
+blupf90_path: "/usr/local/bin/blupf90"
+
+postGSf90_path: "/usr/local/bin/postGSf90"

@@ -1,0 +1,352 @@
+---
+title: "Regional weaning weight GWAS: High Plains vs. Southeast vs. Fescue Belt"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+    code_folding: hide 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(rlang)
+library(glue)
+library(ggplot2)
+library(lubridate)
+library(forcats)
+library(magrittr)
+library(purrr)
+library(qvalue)
+library(tidylog)
+
+
+source(here::here("source_functions/region_key.R"))
+source(here::here("source_functions/read_snp_sol.R"))
+source(here::here("source_functions/regions_manhattan.R"))
+
+options(scipen=999)
+```
+
+# Notes & questions
+
+* GCTA bivariate GREML
+* GCTA fastGWA
+---
+
+* What qualifies as a GxE SNP? 
+    + Large difference in SNP effect between regions? 
+    + Peaks that appear in one region but not the other?
+* Color significant SNPs based on whether or not they're found in the other analysis?
+* Maybe start truncating at 2000 instead of 1990?
+
+ CONVERT_HASH_IJA_GENERAL: too many elements found in a hash matrix
+ The upper limit & actual number of elements  2,147,483,647           10,965,740,000
+
+
+# Setup
+
+* SNP solutions & p-values from 5 GWAS:
+    + Southeast, spring calving only
+    + Southeast, spring & fall calving
+    + Fescue Belt, spring calving only
+    + Fescue Belt, spring & fall calving
+    + High Plains, spring & fall calving
+
+```{r}
+analyses <- c("2_spring", "2_all", "8_spring", "8_all", "3_all")
+
+analyses_regions <- c(2, 2, 8, 8, 3)
+```
+
+
+```{r}
+
+snp_sol <-
+  purrr::map2(
+    .x = analyses_regions,
+    .y = analyses,
+    ~ read_snp_sol_ww(r1 = .x, analysis = .y)
+  ) %>%
+  reduce(bind_rows)
+
+```
+
+* Sliding window variance from same 5 GWAS
+
+```{r}
+windows_var <-
+  purrr::map2(
+    .x = analyses_regions,
+    .y = analyses,
+    ~ read_windows_var(r1 = .x, analysis = .y)
+  ) %>%
+  reduce(bind_rows) 
+```
+
+
+```{r}
+region_key %<>% 
+  # In order to plot with HP always on top
+  mutate(desc = as_factor(desc),
+         desc = fct_inorder(desc))
+```
+
+
+
+# Weaning weight direct
+
+## SNP effects
+
+* Plot SNP effects for all 5 GWAS
+
+```{r, fig.width = 12, fig.height=7}
+
+purrr::map2(
+  .x = analyses,
+  .y = analyses_regions,
+  .f = function(x, y) {
+    df <-
+      snp_sol %>%
+      filter(effect == "direct") %>%
+      filter(analysis == x)
+    
+    title_desc <-
+      df %>%
+      left_join(region_key, by = c("region" = "num")) %>%
+      mutate(sub =
+               case_when(
+                 str_detect(analysis, "all") ~ glue("{desc} (fall & spring calving)"),
+                 str_detect(analysis, "spring") ~ glue("{desc} (spring calving)"),
+               )) %>%
+      distinct(sub) %>%
+      pull(sub)
+    
+    gg <-
+      df %>%
+      regions_manhattan(
+        y_var = snp_effect,
+        y_lab = "Estimated SNP effect",
+        plot_title = glue("SNP effects: weaning weight direct"),
+        sigline = FALSE
+      ) +
+      labs(subtitle = title_desc)
+    
+    ggsave(
+      plot = gg,
+      filename = here::here(glue(
+        "figures/gwas_ww/ww_dir.snp_effects.{x}.png"
+      )),
+      width = 12,
+      height = 7
+    )
+  }
+)
+
+```
+
+
+## P-values
+
+### Spring calving only
+
+```{r fig.width = 12, fig.height=7}
+
+snp_sol %>%
+  filter(effect == "direct") %>%
+  filter(analysis %in% c("2_spring", "8_spring", "3_all")) %>%
+  regions_manhattan(y_var = neglog10p,
+                    y_lab = "-log10(p-value)",
+                    plot_title = "Weaning weight (direct effect)",
+                    facet = TRUE,
+                    sigline = TRUE,
+                    nfacets = 3) +
+  labs(subtitle = "Spring calving")
+
+ggsave(here::here("figures/gwas_ww/ww_dir.manhattan_p.3v2v8_spring.png"),
+      width = 12,
+       height = 7)
+```
+
+### Spring & fall calving
+
+```{r fig.width = 12, fig.height=7}
+
+snp_sol %>%
+  filter(effect == "direct") %>%
+  filter(analysis %in% c("2_all", "8_all", "3_all")) %>%
+  regions_manhattan(y_var = neglog10p,
+                    y_lab = "-log10(p-value)",
+                    plot_title = "Weaning weight (direct effect)",
+                    facet = TRUE,
+                    sigline = TRUE,
+                    nfacets = 3) +
+  labs(subtitle = "Spring & fall calving")
+
+ggsave(here::here("figures/gwas_ww/ww_dir.manhattan_p.3v2v8_all.png"),
+      width = 12,
+       height = 7)
+```
+
+
+# Weaning weight maternal
+
+## SNP effects
+
+* Plot SNP effects for all 5 GWAS
+
+```{r, fig.width = 12, fig.height=7}
+
+purrr::map2(
+  .x = analyses,
+  .y = analyses_regions,
+  .f = function(x, y) {
+    df <-
+      snp_sol %>%
+      filter(effect == "maternal") %>%
+      filter(analysis == x)
+    
+    title_desc <-
+      df %>%
+      left_join(region_key, by = c("region" = "num")) %>%
+      mutate(sub =
+               case_when(
+                 str_detect(analysis, "all") ~ glue("{desc} (fall & spring calving)"),
+                 str_detect(analysis, "spring") ~ glue("{desc} (spring calving)"),
+               )) %>%
+      distinct(sub) %>%
+      pull(sub)
+    
+    gg <-
+      df %>%
+      regions_manhattan(
+        y_var = snp_effect,
+        y_lab = "Estimated SNP effect",
+        plot_title = glue("SNP effects: weaning weight maternal"),
+        sigline = FALSE
+      ) +
+      labs(subtitle = title_desc)
+    
+    ggsave(
+      plot = gg,
+      filename = here::here(glue(
+        "figures/gwas_ww/ww_mat.snp_effects.{x}.png"
+      )),
+      width = 12,
+      height = 7
+    )
+  }
+)
+
+```
+
+## P-values
+
+### Spring calving only
+
+```{r fig.width = 12, fig.height=7}
+
+snp_sol %>%
+  filter(effect == "maternal") %>%
+  filter(analysis %in% c("2_spring", "8_spring", "3_all")) %>%
+  regions_manhattan(y_var = neglog10p,
+                    y_lab = "-log10(p-value)",
+                    plot_title = "Weaning weight (maternal effect)",
+                    facet = TRUE,
+                    sigline = TRUE,
+                    nfacets = 3) +
+  labs(subtitle = "Spring calving")
+
+ggsave(here::here("figures/gwas_ww/ww_mat.manhattan_p.3v2v8_spring.png"),
+      width = 12,
+       height = 7)
+```
+
+### Spring & fall calving
+
+```{r fig.width = 12, fig.height=7}
+
+snp_sol %>%
+  filter(effect == "maternal") %>%
+  filter(analysis %in% c("2_all", "8_all", "3_all")) %>%
+  regions_manhattan(y_var = neglog10p,
+                    y_lab = "-log10(p-value)",
+                    plot_title = "Weaning weight (maternal effect)",
+                    facet = TRUE,
+                    sigline = TRUE,
+                    nfacets = 3) +
+  labs(subtitle = "Spring & fall calving")
+
+ggsave(here::here("figures/gwas_ww/ww_mat.manhattan_p.3v2v8_all.png"),
+      width = 12,
+       height = 7)
+```
+
+
+# Window variance
+
+```{r, eval = FALSE}
+windows_var %>% 
+  group_by(analysis, effect) %>% 
+  arrange(desc(var_exp)) %>% 
+  slice(1:20) %>% 
+  ungroup() %>% 
+  mutate(query = glue("{chr}:{start_win}..{end_win}")) %>% 
+  select(query) %>% 
+  distinct() %>% 
+  write_tsv(here::here("data/windows_query.txt"), col_names = FALSE)
+
+
+```
+
+Match to bovine mine queries
+
+```{r, eval=FALSE}
+
+
+top_20_win <-
+  windows_var %>%
+  group_by(analysis, effect) %>%
+  arrange(desc(var_exp)) %>%
+  slice(1:20) %>%
+  ungroup() %>%
+  mutate(query = glue("{chr}:{start_win}..{end_win}")) %>%
+  select(analysis, effect, query, var_exp, chr, start_win, end_win) 
+
+
+all_genes <-
+  top_20_win %>%
+  left_join(
+    read_csv(here::here("data/raw_data/all238.genes.csv")) %>%
+      janitor::clean_names() %>%
+      select(symbol, user_input),
+    by = c("query" = "user_input")
+  ) %>%
+  filter(!is.na(symbol)) %>%
+  distinct()
+
+
+```
+
+```{r}
+all_genes %>% 
+  group_by(symbol, chr, query) %>% 
+  summarise(n_analyses = n_distinct(analysis, effect)) %>% 
+  arrange(desc(n_analyses)) %>% 
+  View()
+```
+
+
+# Commentary
+
+* Weaning weight direct, pick up mostly known growth QTL for all 3 regions
+    + More significant hits in 2_all vs. 2_spring: more samples, more power
+    
+
+
+

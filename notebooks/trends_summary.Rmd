@@ -1,0 +1,294 @@
+---
+title: "Trends over time"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(tidylog)
+library(visdat)
+library(grid)
+library(gganimate)
+
+source(here::here("source_functions/solutions_map.R"))
+source(here::here("source_functions/solutions_line.R"))
+
+```
+
+# Notes & questions
+
+# Setup
+
+```{r}
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+```
+
+
+```{r}
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+```
+
+---
+
+
+
+```{r, cache=TRUE, eval=FALSE}
+cg_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  filter(trait == "ww" & var == "cg_sol") %>%
+  filter(n_animals > 4) %>%
+  group_by(year) %>%
+  mutate(year_sd = sd(value),
+         year_mean = mean(value),
+         keep = case_when(
+           value > year_mean + year_sd ~ "YES",
+           value < year_mean - year_sd ~ "YES",
+           TRUE ~ "NO"
+         )) %>% 
+  ungroup() %>% 
+  filter(keep == "YES") %>% 
+#  sample_frac(0.2) %>%
+      ggplot(aes(
+        x = lng,
+        y = lat,
+        color = "goldenrod",
+        size = n_animals
+      )) +
+      geom_point(
+        alpha = 0.3,
+        #size = 0.5
+        ) +
+      scale_size(
+        range = c(1,4)
+      ) +
+      usa +
+      scale_x_continuous(expand = c(0, 0)) +
+      scale_y_continuous(expand = c(0, 0)) +
+      coord_map("albers", lat0 = 39, lat1 = 45) +
+      cowplot::theme_map() +
+      labs(
+        x = NULL,
+        y = NULL,
+        color = NULL,
+        title = str_wrap( "Weaning weight CG solutions, low to high", width = 55)
+      ) +
+      #Set the "anchoring point" of the legend (bottom-left is 0,0; top-right is 1,1)
+      #Put bottom-left corner of legend box in bottom-left corner of graph
+      theme(
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        # Padding around the legend
+        # top, right, bottom, left
+        # legend.box.margin = margin(b = 0, r = 0.2, unit = "cm"),
+        # Padding around the plot
+        plot.margin = margin(
+          t = 0.7,
+          r = 0,
+          b = 0.7,
+          l = 1,
+          unit = "cm"
+        ),
+        plot.title = element_text(
+          # size = 56,
+          # family =  "lato",
+          size = 22,
+          vjust = 6,
+          face = "italic"
+        )
+      ) +
+      # https://stackoverflow.com/questions/32656553/plot-legend-below-the-graphs-and-legend-title-above-the-legend-in-ggplot2
+      guides(
+        color = FALSE,
+        size = FALSE
+      ) +
+  gganimate::transition_reveal(value) %>% 
+  animate()
+
+
+# anim_save(filename = here::here("figures/ww_solutions_appear.gif"), nframes = 48, fps = 2)
+```
+
+
+# Summary: year-to-year CG solutions by region {.tabset}
+
+* "Your EPDs are not affected by weather/climate/environment"
+
+## Weaning weight
+
+
+### Actual adjusted weights
+
+```{r, fig.width=10, fig.height=5.4}
+
+animal_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_line(
+    effect_var = "weight",
+    trait_var = "ww",
+    y_lab = "Mean adjusted weaning weight",
+    plot_title = "Year-to-year weaning weights by region",
+    national_avg = TRUE
+    )
+
+
+
+ggsave(here::here("figures/ww_pheno.solutions_line_year.png"), width = 10, height = 5.4)
+```
+
+
+### Contemporary group solutions
+
+```{r, fig.width=10, fig.height=5.4}
+
+cg_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_line(
+    effect_var = "cg_sol",
+    trait_var = "ww",
+    y_lab = "Mean CG solution",
+    plot_title = "Weaning weight contemporary group solutions reflect\nyear-to-year environmental trends",
+    national_avg = TRUE
+    ) +
+  lims(y = c(440, 580))
+
+
+
+ggsave(here::here("figures/ww_cg.solutions_line_year.png"), width = 10, height = 5.4)
+```
+
+### Breeding value solutions
+
+```{r, fig.width=10, fig.height=5.4, cache=TRUE}
+
+animal_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_line(
+    effect_var = "bv_sol",
+    trait_var = "ww",
+    y_lab = "Mean breeding value",
+    plot_title = "Weaning weight genetic trend: 1973-2019",
+    national_avg = TRUE
+    )
+
+
+
+#ggsave(here::here("figures/ww_bv.solutions_line_year.png"), width = 10, height = 5.4)
+```
+
+### Maternal effect solutions
+
+```{r, fig.width=10, fig.height=5.4, cache=TRUE}
+
+animal_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_line(
+    effect_var = "mat_sol",
+    trait_var = "ww",
+    y_lab = "Mean maternal effect solution",
+    plot_title = "Milk genetic trend: 1973-2019",
+    national_avg = TRUE
+    )
+
+
+
+#ggsave(here::here("figures/ww_mat.solutions_line_year.png"), width = 10, height = 5.4)
+```
+
+
+
+## Post-weaning gain
+
+(Removed data from 1972: weird outlier, only one region with data)
+
+### Contemporary group solutions
+
+```{r, fig.width=10, fig.height=5.4}
+
+cg_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_line(
+    effect_var = "cg_sol",
+    trait_var = "pwg",
+    y_lab = "Mean CG solution",
+    plot_title = "Post-weaning gain contemporary group solutions reflect\nyear-to-year environmental trends",
+    national_avg = TRUE
+    ) 
+
+ggsave(here::here("figures/pwg_cg.solutions_line_year.png"), width = 10, height = 5.4)
+
+```
+
+### Actual adjusted weights
+
+```{r, fig.width=10, fig.height=5.4, cache=TRUE}
+
+animal_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_line(
+    effect_var = "weight",
+    trait_var = "pwg",
+    y_lab = "Mean adjusted post-weaning gain",
+    plot_title = "Year-to-year post-weaning gain by region", 
+    national_avg = TRUE
+    )
+
+
+
+ggsave(here::here("figures/pwg_pheno.solutions_line_year.png"), width = 10, height = 5.4)
+```
+
+
+### Breeding value solutions
+
+```{r, fig.width=10, fig.height=5.4}
+
+animal_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_line(
+    effect_var = "bv_sol",
+    trait_var = "pwg",
+    y_lab = "Mean breeing value",
+    plot_title = "Post-weaning gain genetic trend: 1973-2019",
+    national_avg = TRUE
+    ) 
+
+#ggsave(here::here("figures/pwg_bv.solutions_line_year.png"), width = 10, height = 5.4)
+
+```
+
+* What's up with 1972 region 5??
+
+```{r}
+
+cg_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+      filter(trait == "pwg" & var == "cg_sol") %>%
+      mutate(yr = lubridate::year(weigh_date),
+             region = as.character(region)) %>%
+      group_by(region, yr) %>%
+  summarise(mean = mean(value)) %>% 
+      bind_rows(
+        cg_regions %>%
+          filter(trait == "pwg" & var == "cg_sol") %>%
+          mutate(yr = lubridate::year(weigh_date)) %>%
+          group_by(yr) %>%
+          summarise(mean = mean(value)) %>%
+          mutate(region = "All regions")
+      ) %>% 
+  arrange(yr)
+```
+
+# Commentary
+ 
+During routine genetic evaluation, contemporary group solutions are discarded, or at least un

@@ -1,0 +1,228 @@
+---
+title: "Environmental variance"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(tidylog)
+```
+
+
+
+# Notes & questions
+
+* I think I need to be looking at the residual not the CG solutions
+
+# Setup
+
+```{r}
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+```
+
+```{r}
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+```
+
+# Plot 
+
+## Total population 
+
+```{r, fig.width=10, fig.height=5.4}
+cg_regions %>%
+  # At least 5 animals per CG
+  filter(n_animals > 4 & trait == "ww" & var == "cg_sol") %>%
+  # Very little data at most recent and earliest years
+  filter(!year %in% c(1972, 2019)) %>%
+  group_by(year) %>%
+  summarise(mean_cg = mean(value),
+            #var_cg = var(log(value))
+            var_cg = var(value),
+            sd_cg = sd(value)
+            ) %>%
+  ggplot(aes(x = year,
+             y = mean_cg
+             #y = value
+             )) +
+  geom_line() +
+  geom_ribbon(aes(
+    ymin = mean_cg - sd_cg,
+    ymax = mean_cg + sd_cg
+    ),
+    alpha = 0.1
+    ) +
+  #geom_point() +
+  #geom_smooth(aes(color = "red")) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      size = 22,
+      face = "italic",
+      margin = margin(
+        t = 0,
+        r = 0,
+        b = 13,
+        l = 0
+      )
+    ),
+    axis.title = element_text(size = 16),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 14),
+    legend.position = "none"
+  ) +
+  labs(
+    x = NULL,
+    y = "Variance of CG solutions",
+    title = "Contemporary group variance has increased over time",
+    color = NULL
+  )
+  
+```
+
+## Stratified by region
+
+```{r, fig.width=10, fig.height=5.4}
+cg_regions %>% 
+  filter(n_animals > 4) %>% 
+  filter(!year %in% c(1972, 2019)) %>% 
+  group_by(year, region) %>% 
+  summarise(mean_cg = mean(value),
+            var_cg = var(value)) %>% 
+  ggplot(aes(x = year,
+             y = var_cg,
+             color = forcats::as_factor(region))) +
+  geom_point() +
+  geom_smooth() +
+        scale_color_manual(
+        values = c(
+          "1" = "tomato2",
+          "2" = "darkslategray4",
+          "3" = "springgreen3",
+          "4" = "brown",
+          "5" = "goldenrod1",
+          "6" = "gray50",
+          "7" = "deeppink3",
+          "8" = "gray17",
+          "9" = "slateblue2",
+          "All regions" = "red"
+        ),
+        labels = c(
+          "1" = "1: Desert",
+          "2" = "2: Southeast",
+          "3" = "3: High Plains",
+          "4" = "4: Rainforest",
+          "5" = "5: Arid Prairie",
+          "6" = "6: Cold Desert",
+          "7" = "7: Forested Mountains",
+          "8" = "8: Fescue Belt",
+          "9" = "9: Upper Midwest & Northeast",
+          "All regions" = "National average"
+        )
+      ) +
+  theme_classic() +
+        theme(
+        plot.title = element_text(
+          size = 22,
+          face = "italic",
+          margin = margin(
+            t = 0,
+            r = 0,
+            b = 13,
+            l = 0
+          )
+        ),
+        axis.title = element_text(size = 16),
+        axis.title.y = element_text(margin = margin(
+          t = 0,
+          r = 13,
+          b = 0,
+          l = 0
+        )),
+        axis.title.x = element_text(margin = margin(
+          t = 13,
+          r = 0,
+          b = 0,
+          l = 0
+        )),
+        axis.text = element_text(size = 14)
+      ) +
+  labs(x = NULL,
+       y = "Variance of CG solutions",
+       title = "Contemporary group variance has increased over time") +
+  facet_wrap(~ region)
+  
+```
+
+
+# Model change in variance through years
+
+* Jared: "Fit a linear model of the dependent variable vs. time. Get residuals. Either take the absolute value or square the residuals. Fit a second linear model in which you regress the squared residuals against time."
+
+```{r}
+year_cg_mod <-
+  # Regress value on year
+  lm(value ~ year, data = cg_regions) %>% 
+  # Augment original data with residuals from model
+  broom::augment() %>% 
+  # Square residuals
+  mutate(sq_resid = .resid^2) %>% 
+  # Regress squared residuals on year
+  lm(sq_resid ~ year, data = .)
+```
+
+```{r}
+summary(year_cg_mod)
+```
+
+```{r}
+anova(year_cg_mod)
+```
+
+## Coefficient of variation
+
+* WL p. 573: "One technical comment before proceeding is that simple scale effects can also result in a change in the variance — if the coefficient of variation remains constant as its mean changes, then its variance must also change."
+
+### Actual adjusted weaning weights
+
+```{r}
+animal_regions %>% 
+  filter(n_animals > 4 & trait == "ww" & var == "weight") %>% 
+  filter(!year %in% c(1972, 2019)) %>% 
+  group_by(year) %>% 
+  summarise(mean = mean(value),
+            CV = sqrt((var(value))/(mean(value))))
+```
+
+### Contemporary group solutions
+
+```{r}
+cg_regions %>% 
+  filter(n_animals > 4 & trait == "ww" & var == "cg_sol") %>% 
+  filter(!year %in% c(1972, 2019)) %>% 
+  group_by(year) %>% 
+  summarise(mean = mean(value),
+            CV = sqrt((var(value))/(mean(value))))
+```
+

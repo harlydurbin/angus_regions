@@ -1,0 +1,397 @@
+---
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+params:
+  rundate: "190812"
+  r1: "3"
+  r2: "8"
+title: "`r glue::glue('Bivariate weaning weight model variance components results (region {params$r1} vs. region {params$r2})')`"
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(glue)
+library(stringr)
+library(magrittr)
+library(purrr)
+library(ggplot2)
+library(rlang)
+library(tidylog)
+
+source(here::here("source_functions/melt_aireml.R"))
+source(here::here("source_functions/gather_solutions.R"))
+
+
+region_key <-
+  tribble(~num, ~abbrv, ~desc,
+          2, "SE", "Southeast",
+          8, "FB", "Fescue Belt",
+          3, "HP", "High Plains", 
+          5, "AP", "Arid Prairie",
+          7, "FM", "Forested Mountains", 
+          1, "D", "Desert",
+          9, "UMWNE", "Upper Midwest & Northeast")
+
+r1_abbrv <- 
+  region_key %>% 
+  filter(num == params$r1) %>% 
+  pull(abbrv)
+  
+r1_desc <-  
+  region_key %>% 
+  filter(num == params$r1) %>% 
+  pull(desc)
+ 
+
+r2_abbrv <- 
+  region_key %>% 
+  filter(num == params$r2) %>% 
+  pull(abbrv)
+
+
+r2_desc <-  
+  region_key %>% 
+  filter(num == params$r2) %>% 
+  pull(desc)
+
+options(scipen=999)
+```
+
+
+# Import/setup
+
+
+```{r}
+sol_univ <-
+  gather_univ(
+    rundate = params$rundate,
+    r1 = params$r1,
+    r2 = params$r2,
+    growth_trait = "ww"
+  )
+
+
+```
+
+
+```{r}
+sol_biv <-
+  gather_biv(
+    rundate = params$rundate,
+    r1 = params$r1,
+    r2 = params$r2,
+    growth_trait = "ww"
+  )
+
+```
+
+
+
+
+```{r}
+both <- read_table2(here::here(glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/ped.{r1_abbrv}_{r2_abbrv}.txt")), col_names = FALSE)
+
+r1dat <- read_table2(here::here(glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r1_abbrv}/data.{r1_abbrv}.txt")), col_names = FALSE)
+
+r2dat <-  read_table2(here::here(glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r2_abbrv}/data.{r2_abbrv}.txt")), col_names = FALSE)
+
+```
+
+
+# Notes
+
+## Univariate and bivariate full
+
+* `r scales::comma(nrow(both))` total animals, with and without records
+* `r scales::comma(nrow(r1dat))` from `r r1_desc` with records
+* `r scales::comma(nrow(r2dat))` from `r r2_desc` with records
+
+# Distribution of breeding values
+
+## Univariate
+
+```{r, fig.width=8, fig.height=6}
+
+sol_univ %>%
+  filter(effect == "bv_sol") %>%
+  ggplot(aes(x = solution,
+             fill = forcats::as_factor(region))) +
+  geom_density(show.legend = FALSE) +
+  facet_wrap(~ region,
+             nrow = 2,
+             labeller = labeller(
+               region = c(
+                 "1" = "1: Desert",
+                 "2" = "2: Southeast",
+                 "3" = "3: High Plains",
+                 "4" = "4: Rainforest",
+                 "5" = "5: Arid Prairie",
+                 "6" = "6: Cold Desert",
+                 "7" = "7: Forested Mountains",
+                 "8" = "8: Fescue Belt",
+                 "9" = "9: Upper Midwest & Northeast"
+                 )
+               )
+             ) +
+  scale_fill_manual(
+    values = c(
+      "1" = "tomato2",
+      "2" = "darkslategray4",
+      "3" = "springgreen3",
+      "4" = "brown",
+      "5" = "goldenrod1",
+      "6" = "gray50",
+      "7" = "deeppink3",
+      "8" = "gray17",
+      "9" = "slateblue2"
+    )
+  ) +
+  labs(title = "Distribution of breeding values, single-trait model",
+       x = "Breeding value",
+       y = "Kernel density") +
+  theme_classic() +
+    theme(
+    plot.title = element_text(
+      size = 20,
+      face = "italic",
+      margin = margin(t = 0, r = 0, b = 13, l = 0)
+    ),
+    axis.title = element_text(
+      size = 16 
+    ),
+    axis.title.y = element_text(
+      margin = margin(t = 0, r = 13, b = 0, l = 0)
+    ),
+    axis.title.x = element_text(
+      margin = margin(t = 13, r = 0, b = 0, l = 0)
+    ),
+    axis.text = element_text(
+      size = 14
+    ),
+    legend.text = element_text(
+      size = 14
+    ),
+    strip.text.x = element_text(
+      size = 14
+    )
+  )
+
+```
+
+## Bivariate
+
+```{r, fig.width=8, fig.height=6}
+
+sol_biv %>% 
+  filter(effect == "bv_sol") %>% 
+  ggplot(aes(
+    x = solution,
+    fill = forcats::as_factor(region)
+  )) +
+  geom_density(show.legend = FALSE) +
+  facet_wrap( ~ region, 
+              nrow = 2, 
+              labeller = labeller(
+               region = c(
+                 "1" = "1: Desert",
+                 "2" = "2: Southeast",
+                 "3" = "3: High Plains",
+                 "4" = "4: Rainforest",
+                 "5" = "5: Arid Prairie",
+                 "6" = "6: Cold Desert",
+                 "7" = "7: Forested Mountains",
+                 "8" = "8: Fescue Belt",
+                 "9" = "9: Upper Midwest & Northeast"
+                 )
+               )
+              ) +
+  scale_fill_manual(
+    values = c(
+      "1" = "tomato2",
+      "2" = "darkslategray4",
+      "3" = "springgreen3",
+      "4" = "brown",
+      "5" = "goldenrod1",
+      "6" = "gray50",
+      "7" = "deeppink3",
+      "8" = "gray17",
+      "9" = "slateblue2"
+    )
+  ) +
+  labs(title = "Distribution of breeding values, multi-trait model",
+       x = "Breeding value",
+       y = "Kernel density") +
+  theme_classic() +
+    theme(
+    plot.title = element_text(
+      size = 20,
+      face = "italic",
+      margin = margin(t = 0, r = 0, b = 13, l = 0)
+    ),
+    axis.title = element_text(
+      size = 16 
+    ),
+    axis.title.y = element_text(
+      margin = margin(t = 0, r = 13, b = 0, l = 0)
+    ),
+    axis.title.x = element_text(
+      margin = margin(t = 13, r = 0, b = 0, l = 0)
+    ),
+    axis.text = element_text(
+      size = 14
+    ),
+    legend.text = element_text(
+      size = 14
+    ),
+    strip.text.x = element_text(
+      size = 14
+    )
+  )
+
+```
+
+
+# Heritability
+
+## Univariate
+
+### `r r1_desc`
+
+```{r, eval = TRUE}
+
+melt_aireml(
+  path = glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r1_abbrv}/airemlf90.{r1_abbrv}.log"),
+  effect2 = c(glue("{r1_abbrv}_dir"), glue("{r1_abbrv}_mat")),
+  effect4 = c(glue("{r1_abbrv}_mpe")),
+  resids = c(glue("{r1_abbrv}_resid"))
+  ) %>% 
+  mutate_at(vars(contains("val")), ~ str_remove(., glue("{r1_abbrv}_"))) %>%
+  mutate(
+    val1 = 
+      case_when(
+        val1 == "dir" & val2 == "mat" ~ "dir_mat",
+        TRUE ~ val1
+        ),
+    val2 = if_else(val1 == "dir_mat", val1, val2)
+    ) %>% 
+  filter(val1 == val2) %>% 
+  select(-val2) %>% 
+  spread(val1, var_cov) %>% 
+  summarise(
+    !!glue("Direct h2 ({ensym(r1_desc)})") := dir/sum(dir, mat, dir_mat, mpe, resid),
+    !!glue("Milk h2 ({ensym(r1_desc)})") := mat/sum(dir, mat, dir_mat, mpe, resid),
+    !!glue("MPE c2 ({ensym(r1_desc)})") := mpe/sum(dir, mat, dir_mat, mpe, resid),
+    `Total variance` = sum(dir, mat, dir_mat, mpe, resid)
+    ) 
+
+```
+
+### `r r2_desc`
+
+```{r, eval = TRUE}
+
+melt_aireml(
+  path = glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/{r2_abbrv}/airemlf90.{r2_abbrv}.log"),
+  effect2 = c(glue("{r2_abbrv}_dir"), glue("{r2_abbrv}_mat")),
+  effect4 = c(glue("{r2_abbrv}_mpe")),
+  resids = c(glue("{r2_abbrv}_resid"))
+  ) %>% 
+  mutate_at(vars(contains("val")), ~ str_remove(., glue("{r2_abbrv}_"))) %>%
+  mutate(
+    val1 = 
+      case_when(
+        val1 == "dir" & val2 == "mat" ~ "dir_mat",
+        TRUE ~ val1
+        ),
+    val2 = if_else(val1 == "dir_mat", val1, val2)
+    ) %>% 
+  filter(val1 == val2) %>% 
+  select(-val2) %>% 
+  spread(val1, var_cov) %>% 
+  summarise(
+    !!glue("Direct h2 ({ensym(r2_desc)})") := dir/sum(dir, mat, dir_mat, mpe, resid),
+    !!glue("Milk h2 ({ensym(r2_desc)})") := mat/sum(dir, mat, dir_mat, mpe, resid),
+    !!glue("MPE c2 ({ensym(r2_desc)})") := mpe/sum(dir, mat, dir_mat, mpe, resid),
+    `Total variance` = sum(dir, mat, dir_mat, mpe, resid)
+    ) 
+
+```
+
+
+
+
+## Bivariate
+
+```{r}
+melt_aireml(
+  path = glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/airemlf90.{r1_abbrv}_{r2_abbrv}.log"),
+  effect2 = c(glue("{r1_abbrv}_dir"), glue("{r2_abbrv}_dir"), glue("{r1_abbrv}_mat"), glue("{r2_abbrv}_mat")),
+  effect4 = c(glue("{r1_abbrv}_mpe"), glue("{r2_abbrv}_mpe")),
+  resids = c(glue("{r1_abbrv}_resid"), glue("{r2_abbrv}_resid"))
+  ) %>% 
+  mutate(key = 
+           case_when(
+             str_detect(val1, r1_abbrv) ~ r1_desc, 
+             str_detect(val1, r2_abbrv) ~ r2_desc,
+             ),
+         val1 = 
+           case_when(
+             val1 == glue("{r1_abbrv}_dir") & val2 == glue("{r1_abbrv}_mat") ~ glue("{r1_abbrv}_dir_mat"),
+             val1 == glue("{r2_abbrv}_dir") & val2 == glue("{r2_abbrv}_mat") ~glue("{r2_abbrv}_dir_mat"),
+             TRUE ~ val1
+           ),
+         val2 = if_else(str_detect(val1, "dir_mat"), val1, val2)
+         ) %>% 
+  filter(val1 == val2) %>% 
+  select(-val2) %>% 
+  mutate(val1 = str_remove(val1, glue("{r1_abbrv}_|{r2_abbrv}_"))) %>% 
+  tidyr::pivot_wider(
+    id_cols = key,
+    names_from = val1,
+    values_from = var_cov
+    ) %>% 
+  group_by(key) %>% 
+  summarise(
+    !!glue("Direct h2") := dir/sum(dir, mat, dir_mat, mpe, resid),
+    !!glue("Milk h2") := mat/sum(dir, mat, dir_mat, mpe, resid),
+    !!glue("MPE c2") := mpe/sum(dir, mat, dir_mat, mpe, resid),
+    `Total variance` = sum(dir, mat, dir_mat, mpe, resid)
+    )
+```
+
+
+# Genetic correlations
+
+## Full bivariate run
+
+### WW direct & milk
+
+```{r}
+read_table2(here::here(glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/airemlf90.{r1_abbrv}_{r2_abbrv}.log")),
+            skip = 9,
+            n_max = 4,
+            col_names = c(glue("{r1_desc} (direct)"), glue("{r2_desc} (direct)"), glue("{r1_desc} (milk)"), glue("{r2_desc} (milk)"))) %>%
+  mutate(rowname = colnames(.)) %>% 
+  select(rowname, everything())
+```
+
+### Maternal permanent environment
+
+```{r}
+read_table2(here::here(glue("data/f90/{params$rundate}_{params$r1}v{params$r2}_ww/airemlf90.{r1_abbrv}_{r2_abbrv}.log")),
+            skip = 24,
+            n_max = 2,
+ col_names = c(glue("{r1_desc} (MPE)"), glue("{r2_desc} (MPE)"))) %>%
+  mutate(rowname = colnames(.)) %>% 
+  select(rowname, everything())
+```
+

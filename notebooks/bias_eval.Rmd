@@ -1,0 +1,609 @@
+---
+title: "Bias evaluation: test with regions 2 and region 3"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(glue)
+library(magrittr)
+library(purrr)
+library(ggplot2)
+library(rlang)
+library(tidylog)
+
+source(here::here("source_functions/sample_group.R"))
+source(here::here("source_functions/three_gen.R"))
+source(here::here("source_functions/melt_aireml.R"))
+source(here::here("source_functions/biv_heritability.R"))
+source(here::here("source_functions/gather_solutions.R"))
+
+```
+
+```{r}
+region_key <-
+  tribble(~num, ~abbrv, ~desc,
+          2, "SE", "Southeast",
+          8, "FB", "Fescue Belt",
+          3, "HP", "High Plains", 
+          5, "AP", "Arid Prairie",
+          7, "FM", "Forested Mountains", 
+          1, "D", "Desert",
+          9, "UMWNE", "Upper Midwest & Northeast")
+```
+
+
+# Notes
+
+* For each region, randomly drop data for 25% of the animals but leave them in the pedigree. 
+* Have regressed `full ~ partial` but still need to regress `partial ~ full` ($b_{p,w}$ & $b^v_{p,w}$)
+    + "Expectation depends on accuracy"
+* "Expectation of correlation between whole and partial EBVs depends on accuracies"
+
+# Setup
+
+* Pull in original data
+
+```{r, eval = TRUE, message=FALSE}
+source(here::here("source_functions/datuniv_ped.R"))
+```
+
+
+# Generate downsampled data
+
+```{r}
+
+choose_validation_set <-
+  function(df, frac) {
+    
+    val_set <- 
+      df %>% 
+      sample_frac(frac) %>%  
+      mutate(weight = 0)
+    
+    train_set <-
+      df %>% 
+      filter(!id_new %in% val_set$id_new)
+    
+    bind_rows(train_set, val_set)
+    
+    }
+```
+
+## High Plains
+
+```{r, eval=FALSE}
+ww_datuniv_ped %>% 
+  filter(region == 3) %>% 
+  choose_validation_set(frac = 0.25) %>% 
+  write_delim(
+    here::here("data/f90/190916_3v2_lrww/HP/data.HP.txt"),
+    delim = " ",
+    col_names = FALSE
+      )
+  
+```
+
+## Southeast
+
+```{r, eval=FALSE}
+ww_datuniv_ped %>% 
+  filter(region == 2) %>% 
+  choose_validation_set(frac = 0.25) %>% 
+  write_delim(
+    here::here("data/f90/190916_3v2_lrww/SE/data.SE.txt"),
+    delim = " ",
+    col_names = FALSE
+      )
+  
+```
+
+## Bivariate data
+
+```{r, message=FALSE, eval=FALSE}
+c("HP/data.HP.txt", "SE/data.SE.txt") %>%
+  purrr::map(~ read_table2(
+    here::here(glue("data/f90/190916_3v2_lrww/{.x}")),
+    col_names = c("id_new", "cg_new", "weight", "region", "sire_id", "dam_id")
+  )) %>% 
+  reduce(bind_rows) %>% 
+  pivot_wider(
+    values_from = weight,
+    names_from = region
+  ) %>% 
+  mutate_at(vars(`3`, `2`), ~replace_na(., 0)) %>% 
+  select(id_new, cg_new, `3`, `2`, sire_id, dam_id) %>% 
+  write_delim(
+    path = here::here("data/f90/190916_3v2_lrww/data.HP_SE.txt"),
+    delim = " ",
+    col_names = FALSE
+  )
+```
+
+
+# Import results
+
+```{r, message=FALSE}
+
+bias_3v2 <-
+  # "Full" and "reduced" solutions for both regions unvivariate models
+  map2_dfr(
+    .x = list("190916", "190812"),
+    .y = list("lrww", "ww"),
+    ~ gather_univ(
+      r1 = 3,
+      r2 = 2,
+      rundate = .x,
+      growth_trait = .y
+    )
+  ) %>%
+  # "Full" and "reduced" solutions for bivariate models
+  bind_rows(map2_dfr(
+    .x = list("190916", "190812"),
+    .y = list("lrww", "ww"),
+    ~ gather_biv(
+      r1 = 3,
+      r2 = 2,
+      rundate = .x,
+      growth_trait = .y
+    )
+  )) %>%
+  # Keep only ww direct and milk breeding values
+  filter(effect %in% c("bv_sol", "mat_sol")) %>%
+  mutate(analysis =
+           case_when(trait == "ww" ~ "full",
+                     trait == "lrww" ~ "reduced")) %>%
+  select(-trait,-id_biv) %>%
+  # Long to wide: a column for each reduced_solution & full_solution
+  pivot_wider(values_from = solution,
+              names_from = analysis,
+              names_prefix = "solution_") %>%
+  # Attach phenotype data + whether or not they were nulled out
+  left_join(c("HP/data.HP.txt", "SE/data.SE.txt") %>%
+              purrr::map_dfr(~ read_table2(
+                here::here(glue("data/f90/190916_3v2_lrww/{.x}")),
+                col_names = c(
+                  "id_new",
+                  "cg_new",
+                  "weight",
+                  "home_region",
+                  "sire_id",
+                  "dam_id"
+                )
+              ))) %>% 
+  select(id_new, cg_new, sire_id, dam_id, home_region, weight, analysis_region, model, effect, solution_full, solution_reduced)
+```
+
+# Difference between reduced and full breeding values ($\mu_p - \mu_w$)
+
+* Expectation is 0
+
+## Weaning weight direct
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol") %>% 
+  mutate(difference = solution_reduced - solution_full,
+         analysis_region = forcats::as_factor(analysis_region),
+         set = 
+           case_when(
+             weight == 0 ~ "validation",
+             TRUE ~ "reference"
+           )) %>% 
+  ggplot(aes(
+    x = difference
+  )) +
+  geom_density(aes(fill = set),
+               alpha = 0.7) +
+  facet_wrap(~model + analysis_region)
+```
+
+```{r}
+bias_3v2 %>%
+    mutate(difference = solution_reduced - solution_full,
+         analysis_region = forcats::as_factor(analysis_region),
+         set = 
+           case_when(
+             weight == 0 ~ "validation",
+             TRUE ~ "reference"
+           )) %>% 
+  group_by(model, analysis_region, set) %>% 
+  summarise(mean_diff = mean(difference),
+            median_diff = median(difference),
+            max_abs_diff = max(abs(difference)))
+  
+```
+
+
+# Regress breeding values from full univariate on breeding values from reduced univariate
+
+* Should be approximately 1
+
+## High Plains
+
+### Weaning weight direct
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "univariate" & analysis_region == 3) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "univariate" & analysis_region == 3 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+### Milk
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "univariate" & analysis_region == 3) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "univariate" & analysis_region == 3 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+## Southeast
+
+### Weaning weight direct
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "univariate" & analysis_region == 2) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "univariate" & analysis_region == 2 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+### Milk
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "univariate" & analysis_region == 2) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "univariate" & analysis_region == 2 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+# Regress breeding values from full bivariate on breeding values from reduced bivariate
+
+## High Plains
+
+### Weaning weight direct
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "bivariate" & analysis_region == 3) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "bivariate" & analysis_region == 3 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+### Milk
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "bivariate" & analysis_region == 3) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "bivariate" & analysis_region == 3 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+## Southeast
+
+### Weaning weight direct
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "bivariate" & analysis_region == 2) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "bv_sol" & model == "bivariate" & analysis_region == 2 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+### Milk
+
+* All animals in pedigree ($b_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "bivariate" & analysis_region == 2) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+* Only validation animals (phenotype set to null) ($b^v_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  filter(effect == "mat_sol" & model == "bivariate" & analysis_region == 2 & weight == 0) %>% 
+  lm(solution_full ~ solution_reduced, data = .) %>% 
+  summary(.)
+```
+
+
+```{r, fig.width=10, fig.height=8, echo = FALSE, eval=FALSE}
+
+bias2v3 %>% 
+  filter(effect == "bv_sol" & home_region == "HP" & weight == 0) %>% 
+  ggplot(aes(
+    x = solution_reduced,
+    y = solution_full
+    )) +
+  geom_hex(aes(fill = stat(count)),
+           bins = 60) +
+  viridis::scale_fill_viridis(option = "inferno",
+                              direction = 1,
+                              begin = 0.2,
+                              labels = scales::comma
+                              ) +
+  geom_abline(slope = 1,
+              size = 1,
+              linetype = "twodash") +
+  lims(
+    x = c(-100, 100),
+    y = c(-100, 100)
+       ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 28,
+                              face = "italic"),
+    plot.subtitle = element_text(size = 20,
+                                 margin = margin(
+                                   t = 0,
+                                   r = 0,
+                                   b = 13,
+                                   l = 0
+                                 )),
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 14),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 16)
+  ) +
+  labs(x = "Reduced",
+       y = "Full",
+       fill = "Count"
+       )
+```
+
+
+# Correlations
+
+
+* All animals in pedigree ($\rho_{w,p}$)
+
+```{r}
+bias_3v2 %>% 
+  group_by(analysis_region, model, effect) %>% 
+  summarise(cor(solution_full, solution_reduced),
+            n = n_distinct(id_new))
+```
+
+* Only validation animals (phenotype set to null) ($\rho^{v}_{w, p}$) 
+
+```{r}
+bias_3v2 %>% 
+  filter(weight == 0) %>% 
+  group_by(analysis_region, model, effect) %>% 
+  summarise(cor(solution_full, solution_reduced),
+            n = n_distinct(id_new)) %>% 
+  ungroup() %>% 
+  arrange(model, analysis_region)
+```
+
+
+```{r, echo=FALSE, eval=FALSE}
+
+  bias_3v2 %>%
+  filter(effect == "bv_sol") %>%
+  select(id_new,
+         analysis_region,
+         model,
+         solution_full,
+         solution_reduced) %>%
+  mutate(model_region = as.character(glue("{model}_{analysis_region}"))) %>%
+  pivot_wider(
+    id_cols = id_new,
+    values_from = solution_full,
+    names_from = model_region,
+    names_prefix = "full_"
+  ) %>%
+  left_join(
+    bias_3v2 %>%
+      filter(effect == "bv_sol") %>%
+      select(
+        id_new,
+        analysis_region,
+        model,
+        solution_full,
+        solution_reduced
+      ) %>%
+      mutate(model_region = as.character(glue(
+        "{model}_{analysis_region}"
+      ))) %>%
+      pivot_wider(
+        id_cols = id_new,
+        values_from = solution_reduced,
+        names_from = model_region,
+        names_prefix = "reduced_"
+      )
+  ) %>% 
+  select(-id_new) %>% 
+  corrr::correlate(diagonal = 1) 
+```
+
+```{r, echo=FALSE, eval=FALSE}
+  bias_3v2 %>%
+  filter(effect == "bv_sol" & weight == 0) %>%
+  select(id_new,
+         analysis_region,
+         model,
+         solution_full,
+         solution_reduced) %>%
+  mutate(model_region = as.character(glue("{model}_{analysis_region}"))) %>%
+  pivot_wider(
+    id_cols = c("id_new", "analysis_region"),
+    values_from = solution_full,
+    names_from = model,
+    names_prefix = "full_"
+  ) %>%
+  left_join(
+    bias_3v2 %>%
+      filter(effect == "bv_sol") %>%
+      select(
+        id_new,
+        analysis_region,
+        model,
+        solution_full,
+        solution_reduced
+      ) %>%
+      mutate(model_region = as.character(glue(
+        "{model}_{analysis_region}"
+      ))) %>%
+      pivot_wider(
+    id_cols = c("id_new", "analysis_region"),
+        values_from = solution_reduced,
+        names_from = model,
+        names_prefix = "reduced_"
+      )
+  ) %>% 
+  select(-id_new) %>% 
+  group_by(analysis_region) %>% 
+  group_map(
+  ~ corrr::correlate(.x, diagonal = 1) 
+  )
+```
+
+# Heritabilities from reduced analyses
+
+## Univariate
+
+### Southeast
+
+```{r}
+melt_aireml(
+  path = "data/f90/190916_3v2_lrww/SE/airemlf90.SE.log",
+  effect2 = c("SE_dir", "SE_mat"),
+  effect4 = c("SE_mpe"),
+  resids = c("SE_res")
+) %>% 
+  univ_heritability(abbrv = "SE")
+
+```
+
+### High Plains
+
+```{r}
+melt_aireml(
+  path = "data/f90/190916_3v2_lrww/HP/airemlf90.HP.log",
+  effect2 = c("HP_dir", "HP_mat"),
+  effect4 = c("HP_mpe"),
+  resids = c("HP_res")
+) %>% 
+  univ_heritability(abbrv = "HP")
+
+```
+
+
+# Genetic correlations from  reduced bivariate analysis
+
+```{r}
+read_table2(here::here("data/f90/190916_3v2_lrww/airemlf90.HP_SE.log"),
+            skip = 9,
+            n_max = 4,
+            col_names = c(glue("High Plains (direct)"), glue("Southeast (direct)"), glue("High Plains (milk)"), glue("Southeast (milk)"))) %>%
+  mutate(rowname = colnames(.)) %>% 
+  select(rowname, everything())
+```
+

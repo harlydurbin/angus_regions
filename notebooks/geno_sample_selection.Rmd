@@ -1,0 +1,272 @@
+---
+title: "Genotyped sample selection"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+    code_folding: hide 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(rlang)
+library(glue)
+library(ggplot2)
+library(lubridate)
+library(forcats)
+library(magrittr)
+library(purrr)
+library(tidylog)
+
+source(here::here("source_functions/ped.R"))
+```
+
+# Notes & questions
+
+# Setup
+
+```{r, eval = FALSE}
+ped <- pull_ped(refresh = FALSE)
+```
+
+```{r}
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+```
+
+
+# Candidate selection
+
+* Remove years before 1990
+* Remove contemporary groups with fewer than 15 animals
+* Remove single sire & single dam contemporary groups
+* For weaning weight, remove zip codes with fewer than 10 years of data
+* Retain only animals that have both WW and PWG measurement after data edits
+
+```{r, eval = FALSE}
+
+ww_use <-
+  animal_regions %>%
+  # Not using region 4 or 6
+  filter(!region %in% c(4, 6)) %>% 
+  filter(var == "weight" & trait == "ww") %>%
+  # Only 1990 and beyond
+  filter(year >= 1990) %>%
+  # At least 15 animals per cg
+  filter(n_animals >= 15) %>%
+  left_join(
+    ped %>%
+      select(id_new, sire_id, dam_id, birth_year)
+  ) %>%
+  group_by(cg_new) %>%
+  # Remove single sire single dam contemporary groups
+  filter(n_distinct(sire_id) > 1) %>%
+  filter(n_distinct(dam_id) > 1) %>%
+  ungroup() %>% 
+  # In order to easier calculate maternal effects
+  group_by(zip) %>%
+  filter(n_distinct(year) >= 10) %>% 
+  ungroup() %>% 
+  distinct(full_reg)
+
+```
+
+
+```{r, eval = FALSE}
+
+pwg_use <-
+  animal_regions %>%
+  # Not using region 4 or 6
+  filter(!region %in% c(4, 6)) %>% 
+  filter(var == "weight" & trait == "pwg") %>%
+  # Only 1990 and beyond
+  filter(year >= 1990) %>%
+  # At least 15 animals per cg
+  filter(n_animals >= 15) %>%
+  left_join(
+    ped %>%
+      select(id_new, sire_id, dam_id, birth_year)
+  ) %>%
+  group_by(cg_new) %>%
+  # Remove single sire single dam contemporary groups
+  filter(n_distinct(sire_id) > 1) %>%
+  filter(n_distinct(dam_id) > 1) %>%
+  ungroup() %>% 
+  distinct(full_reg)
+
+```
+
+```{r, eval = FALSE}
+all_use <-
+  full_join(
+    ww_use %>% 
+      mutate(ww = TRUE),
+    pwg_use %>% 
+      mutate(pwg = TRUE), 
+    by = c("full_reg")
+  ) %>% 
+  filter(ww == TRUE) %>% 
+  filter(pwg == TRUE)
+```
+
+n = 1,936,330 candidates
+
+```{r, eval = FALSE, echo=FALSE}
+all_use %>% 
+  select(full_reg) %>% 
+  write_delim(path = here::here("data/derived_data/20191211.regions_geno_check.txt"), delim = "\n", col_names = FALSE)
+```
+
+# Confirmed genotyped
+
+```{r}
+genotyped <-
+  read_table2(here::here("data/raw_data/20191211.regions_geno_anms.txt"),
+              col_names = "full_reg") %>%
+  left_join(
+    animal_regions %>% 
+      filter(var == "weight")
+  )
+```
+
+```{r}
+genotyped %>% 
+  distinct(full_reg, region) %>% 
+  group_by(region) %>% 
+  tally() %>% 
+  arrange(desc(n)) %>% 
+  mutate(n = scales::comma(n))
+```
+
+n = 174,418 confirmed genotyped
+
+# Animals in the same zip or CG as genotyped animals
+
+```{r}
+wean_zip <-
+  genotyped %>% 
+  filter(trait == "ww") %>% 
+  distinct(zip) %>% 
+  left_join(
+    animal_regions %>% 
+      filter(trait == "ww") %>% 
+      filter(var == "weight") %>% 
+      filter(n_animals >= 15)
+  )
+```
+
+```{r}
+wean_zip %>% 
+  group_by(region) %>% 
+  tally() %>% 
+  arrange(desc(n)) %>% 
+  mutate(n = scales::comma(n))
+
+```
+
+
+```{r}
+pwg_cg <-
+  genotyped %>% 
+  filter(trait == "pwg") %>% 
+  distinct(cg_new) %>% 
+  left_join(
+    animal_regions %>% 
+      filter(trait == "pwg") %>% 
+      filter(var == "weight") %>% 
+      filter(n_animals >= 15)
+  )
+  
+```
+
+```{r}
+pwg_cg %>% 
+  group_by(region) %>% 
+  tally() %>% 
+  arrange(desc(n)) %>% 
+  mutate(n = scales::comma(n))
+```
+
+# ~~Extract genotyped animals from SNP file~~
+
+Defunct
+
+```{r, eval=FALSE}
+
+full_test <- 
+  ped %>% 
+  sample_n(100) %>% 
+  select(full_reg) %>% 
+  mutate(col_2 = row_number())
+
+```
+
+```{r,eval=FALSE}
+reduced_test <-
+  full_test %>% 
+  sample_n(10) %>% 
+  select(-col_2)
+```
+
+```{r,eval=FALSE}
+write_tsv(full_test, here::here("full_test.txt"), col_names = FALSE)
+
+write_tsv(reduced_test, here::here("reduced_test.txt"), col_names = FALSE)
+```
+
+* Extract rows from `full_test.txt` with a string match in `reduced_test.txt`
+
+```{bash, eval=FALSE}
+# These result in the same thing 
+# Neither sorts by reduced_test.txt
+
+grep -Fwf reduced_test.txt full_test.txt &> join_test.txt
+ 
+ 
+awk 'FNR==NR{a[$1];next}($1 in a){print}' reduced_test.txt full_test.txt  &> join_test.txt
+```
+
+
+# Map file 
+
+"Below is the format of the angus_map file. The last column, column 5 is the one that indicates the position in the genomic string from column 2 in the SNP file.
+
+1) permutation number based on the physical position in the SNP chip
+2) chr number
+3) position in Mb
+4) SNP name from the chip
+5) Position in the SNP file"
+
+
+```{r}
+read_table2(here::here("data/raw_data/angus_map"), col_names = FALSE)
+```
+
+## Update 1/7/2020
+
+In new licensed BLUPF90 version, `chrinfo` is deprecated in favor of `map_file`:
+
+ ** OPTION chrinfo <file> is deprecated  !!             **
+ **                                                     **
+ ** Use OPTION map_file <file> instead !!               **
+ **                                                     **
+ ** The <file> should has a header with the             **
+ **  following column names (no specific order):        **
+ **     SNP_ID identification of the SNP (alphanumeric) **
+ **     CHR chromosome (numeric)                        **
+ **     POS position (bp )                              **
+ ** Extra columns are possible  
+ 
+```{r}
+read_table2(here::here("data/raw_data/angus_map"), col_names = FALSE) %>% 
+  select(SNP_ID = X4, 
+         CHR = X2, 
+         POS = X3) %>% 
+  write_delim(here::here("data/derived_data/map_file.50k.txt"), delim = " ")
+```
+

@@ -1,0 +1,537 @@
+---
+title: "Growth trait contemporary group solutions, maternal effect solutions, and breeding values across regions"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(forcats)
+library(tidyr)
+library(maps)
+library(magrittr)
+library(ggforce)
+#library(tidylog)
+library(gganimate)
+
+source(here::here("source_functions/samples_map.R"))
+source(here::here("source_functions/solutions_map.R"))
+source(here::here("source_functions/solutions_boxswarm.R"))
+source(here::here("source_functions/by_cg.R"))
+
+options(scipen=999)
+```
+
+```{r, eval=TRUE}
+cg_regions <- 
+  readr::read_rds(here::here("data/derived_data/cg_regions.rds")) %>% 
+  filter(n_animals > 1)
+```
+
+
+```{r, eval=TRUE}
+animal_regions <- 
+  readr::read_rds(here::here("data/derived_data/animal_regions.rds")) %>% 
+  filter(n_animals > 1)
+```
+
+
+# Notes & questions
+
+
+
+* Traits in values file:
+    + ~~1 == BW~~
+    + 2 == WW
+    + 3 == YW
+* Effects in values file:
+    + 1 == Contemporary group value (with mean in it? Maybe not fit separately?)
+    + 2 == Breeding value
+    + 3 == Maternal
+    + ~~4 == Permanent environment~~
+
+---
+
+* Should eventually dig more into differences in variane between regions 
+    + Relationship between selection/local adaptation/GxE and phenotypic variance
+        - So that you aren't picking up differences due to variation in management: subtract CG sol from adjusted phenotype, look at variance in that 
+
+# Data summarization 
+  
+Climate regions are as follows:
+
+![](../data/raw_data/regions.png)
+
+
+## Number of CGs per region
+
+```{r}
+
+cg_regions %>% 
+  filter(year >= 1990) %>% 
+  group_by(trait, region, desc) %>% 
+  tally() %>% 
+  ungroup() %>% 
+  mutate(trait = glue::glue("n_{trait}_CGs")) %>% 
+  spread(trait, n) %>% 
+  arrange(desc(n_ww_CGs)) %>% 
+  rename(Region = region,
+         `Region description` = desc,
+         `n PWG CGs` = n_pwg_CGs,
+         `n WW CGs` = n_ww_CGs)
+
+```
+
+## Number of animals per region (sum of animals per CG, stratified by region)
+
+```{r}
+cg_regions %>%
+  filter(year >= 1990) %>% 
+  group_by(trait, region, desc) %>%
+  summarise(n_animals = sum(n_animals)) %>%
+  ungroup() %>%
+  mutate(trait = glue::glue("n_{trait}_animals")) %>%
+  spread(trait, n_animals) %>%
+  arrange(desc(n_ww_animals)) %>%
+  rename(
+    Region = region,
+    `Region description` = desc,
+    `n PWG records` = n_pwg_animals,
+    `n WW records` = n_ww_animals
+  )
+```
+
+```{r ww_sample_map, fig.width=8.76, fig.height=5.4, cache=TRUE}
+
+plot_samples_map(
+  df = cg_regions,
+  trait_var = "ww",
+  effect_var = "cg_sol",
+  plot_title = "Available Angus weaning weight records"
+  )
+
+```
+
+
+## Records per CG
+
+* How many contemporary groups with less than 5 animals?
+    + `r cg_regions %>% filter(trait == "ww") %>% filter(n_animals < 5) %>% n_distinct() %>% scales::comma()` weaning CGs with fewer than 5 animals
+    + `r cg_regions %>% filter(trait == "pwg") %>% filter(n_animals < 5) %>% n_distinct() %>% scales::comma()` yearling CGs with fewer than 5 animals
+
+```{r}
+cg_regions %>% 
+  filter(year >= 1990) %>% 
+  group_by(trait) %>% 
+  summarise(mean_n = mean(n_animals),
+            min_n = min(n_animals),
+            max_n = max(n_animals)) %>% 
+  rename(
+    Trait = trait,
+    Mean = mean_n,
+    Min = min_n,
+    Max = max_n
+  )
+```
+
+### Binned
+
+
+```{r}
+cg_regions %>% 
+  filter(year >= 1990) %>% 
+  mutate(
+    bin =
+      case_when(
+        n_animals == 2 ~ "2",
+        n_animals == 3 ~ "3",
+        n_animals == 4 ~ "4",
+        between(n_animals, 5, 10) ~ "5-10",
+        between(n_animals, 11, 20) ~ "11-20",
+        between(n_animals, 21, 50) ~ "21-50",
+        between(n_animals, 51, 100) ~ "51-100",
+        n_animals > 100 ~ "101+"
+      ),
+    bin = forcats::fct_relevel(bin, c("2", "3", "4", "5-10", "11-20", "21-50", "51-100", "101+"))
+  ) %>% 
+  group_by(trait, bin) %>% 
+  tally() %>% 
+  ungroup() %>% 
+  spread(trait, n) %>% 
+  mutate(pwg = glue::glue("{scales::comma(pwg)} ({scales::percent(pwg/sum(pwg))})"),
+         ww = glue::glue("{scales::comma(ww)} ({scales::percent(ww/sum(ww))})")) %>% 
+  arrange(bin) %>% 
+  rename(
+    Bin = bin,
+    PWG = pwg,
+    WW = ww
+  )
+```
+
+
+```{r, eval = FALSE, echo = FALSE}
+
+cg_regions %>% 
+  filter(trait == "ww" & var == "cg_sol") %>% 
+  tally()
+
+cg_regions %>% 
+  filter(trait == "ww" & var == "cg_sol") %>% 
+  mutate(year = lubridate::year(weigh_date)) %>% 
+  group_by(year) %>% 
+  summarise(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  ggplot(aes(
+    x = as_factor(year),
+    y = n
+  )) +
+  geom_bar(stat = "identity")
+```
+
+
+# Region stratification {.tabset}
+
+## Weaning weight
+
+```{r, eval = TRUE}
+
+
+ww_sum <-
+  cg_regions %>%
+  filter(trait == "ww") %>%
+  filter(!region %in% c(4, 6)) %>% 
+  filter(year >= 1990) %>% 
+  filter(n_animals >= 4) %>% 
+  # group_by(region) %>%
+  # sample_n(100) %>%
+  # ungroup() %>%
+  group_by(desc, var) %>%
+  summarise(median = median(value),
+            sd = sd(value)) %>%
+  ungroup() %>% 
+  tidyr::pivot_wider(
+    id_cols = "desc",
+    names_from = var,
+    values_from = c("median", "sd")
+  ) %>%
+  left_join(
+    animal_regions %>%
+      filter(trait == "ww") %>%
+      filter(!region %in% c(4, 6)) %>%
+      filter(year >= 1990) %>% 
+      # group_by(region) %>%
+      # sample_n(100) %>%
+      # ungroup() %>%
+      group_by(desc, var) %>%
+      summarise(median = median(value),
+                sd = sd(value)) %>%
+      ungroup() %>% 
+      tidyr::pivot_wider(
+        id_cols = "desc",
+        names_from = var,
+        values_from = c("median", "sd")
+      )
+  ) 
+
+ww_sum %>%
+  select(
+    Region = desc,
+    `CG sol. median` = median_cg_sol,
+    `CG sol. SD` = sd_cg_sol,
+    `BV median` = median_bv_sol,
+    `BV SD` = sd_bv_sol,
+    `Mat. sol. median` = median_mat_sol,
+    `Mat. sol. SD` = sd_mat_sol,
+    `Phenotypic median` = median_weight,
+    `Phenotypic SD` = sd_weight
+  ) %>% DT::datatable(options = list(pageLength = 7), rownames = FALSE, caption = "Weaning weight")
+
+
+```
+
+### Adjusted phenotypes
+
+```{r ww_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
+
+animal_regions %>%
+  filter(year >= 1990) %>% 
+  filter(!region %in% c(4, 6)) %>%
+  # Don't care about n in cg for phenotype
+  by_cg(trait_var = "ww", effect_var = "weight") %>%
+  solutions_boxswarm(
+    effect_var = "weight",
+    trait_var = "ww",
+    y_title = "Adjusted weaning weight",
+    plot_title = "Weaning weights across regions\n(1990-present)"
+  )
+
+ggsave(
+  here::here("figures/ww_pheno.solutions_boxswarm_post1990.png"),
+  width = 8.76,
+  height = 5.4
+)
+```
+
+
+### Contemporary group solutions
+
+In the map below, each point represents a zip code (averaged over all contemporary groups and all years post-1990)
+
+```{r ww_map, fig.width=8.76, fig.height=5.4, echo = TRUE}
+  
+cg_regions %>% 
+  filter(year >=1990) %>% 
+  filter(trait == "ww") %>%
+  filter(n_animal >= 4) %>% 
+  group_by(zip) %>% 
+  mutate(sz = sum(n_animals),
+         clr = mean(value)) %>% 
+  ungroup() %>% 
+  select(sz, clr, var, trait, lat, lng) %>% 
+  distinct() %>% 
+  solutions_map(
+  effect_var = "cg_sol",
+  trait_var = "ww",
+  color_var = clr,
+  size_var = sz,
+  size_range = c(0.75, 8), 
+  plot_title = "Weaning weight contemporary group solutions\n(1990-present)"
+)
+  
+ ggsave(here::here("figures/ww_cg.solutions_map_post1990.png"), width = 8.76, height = 5.4)
+```
+
+
+```{r ww_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
+
+cg_regions %>% 
+  filter(year >= 1990) %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  filter(n_animals >= 4) %>% 
+  solutions_boxswarm(
+  effect_var = "cg_sol",
+  trait_var = "ww",
+  y_title = "CG value",
+  plot_title = "Weaning weight contemporary group solutions\n(1990-present)"
+)
+
+ggsave(here::here("figures/ww_cg.solutions_boxswarm_post1990.png"), width = 8.76, height = 5.4)
+```
+
+
+
+### Breeding values
+
+```{r ww_bv, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
+
+
+animal_regions %>%
+  filter(year >= 1990) %>% 
+  filter(n_animals >= 4) %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  by_cg(trait_var = "ww", effect_var = "bv_sol") %>% 
+  solutions_boxswarm(
+    effect_var = "bv_sol",
+    trait_var = "ww",
+    y_title = "Breeding value",
+    plot_title = "Weaning weight breeding values across regions\n(1990-present)"
+  ) +
+  scale_y_continuous(breaks = c(-50, 0, 50, 100, 150))
+
+ggsave(
+  here::here("figures/ww_bv.solutions_boxswarm_post1990.png"),
+  width = 8.76,
+  height = 5.4
+)
+```
+
+### Maternal effects
+
+
+```{r ww_mat, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
+
+animal_regions %>%
+  filter(year >= 1990) %>% 
+  filter(n_animals >= 4) %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  by_cg(trait_var = "ww", effect_var = "mat_sol") %>%
+  solutions_boxswarm(
+    effect_var = "mat_sol",
+    trait_var = "ww",
+    y_title = "Maternal effect solution",
+    plot_title = "Maternal effect solutions (WW) across regions\n(1990-present)"
+  )
+
+ ggsave(
+   here::here("figures/ww_mat.solutions_boxswarm_post1990.png"),
+   width = 8.76,
+   height = 5.4
+ )
+```
+
+## Post-weaning gain
+
+```{r, eval = TRUE, cache=TRUE}
+
+pwg_sum <-
+  cg_regions %>%
+  filter(trait == "pwg") %>%
+  filter(!region %in% c(4, 6)) %>% 
+  filter(n_animals >= 4) %>% 
+  filter(year >= 1990) %>% 
+  # group_by(region) %>%
+  # sample_n(100) %>%
+  # ungroup() %>%
+  group_by(desc, var) %>%
+  summarise(median = median(value),
+            sd = sd(value)) %>%
+  ungroup() %>% 
+  tidyr::pivot_wider(
+    id_cols = "desc",
+    names_from = var,
+    values_from = c("median", "sd")
+  ) %>%
+  left_join(
+    animal_regions %>%
+      filter(trait == "pwg") %>%
+      filter(!region %in% c(4, 6)) %>%
+      filter(year >= 1990) %>% 
+      # group_by(region) %>%
+      # sample_n(100) %>%
+      # ungroup() %>%
+      group_by(desc, var) %>%
+      summarise(median = median(value),
+                sd = sd(value)) %>%
+      ungroup() %>% 
+      tidyr::pivot_wider(
+        id_cols = "desc",
+        names_from = var,
+        values_from = c("median", "sd")
+      )
+  ) 
+
+pwg_sum %>%
+  select(
+    Region = desc,
+    `CG sol. median` = median_cg_sol,
+    `CG sol. SD` = sd_cg_sol,
+    `BV mendian` = median_bv_sol,
+    `BV SD` = sd_bv_sol,
+    `Phenotypic median` = median_weight,
+    `Phenotypic SD` = sd_weight
+  ) %>% 
+  DT::datatable(options = list(pageLength = 7), rownames = FALSE, caption = "Post-weaning gain")
+```
+
+### Adjusted phenotypes
+
+```{r pwg_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
+
+animal_regions %>% 
+  filter(year >= 1990) %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  by_cg(trait_var = "pwg", effect_var = "weight") %>%
+  solutions_boxswarm(
+    effect_var = "weight",
+    trait_var = "pwg",
+    y_title = "Adjusted weight gain",
+    plot_title = "Post-weaning gain across regions\n(1990-present)"
+  )
+
+ggsave(
+  here::here("figures/pwg_pheno.solutions_boxswarm_post1990.png"),
+  width = 8.76,
+  height = 5.4
+)
+```
+
+### Contemporary group solutions
+
+* Surprisngly, more variation across regions than weaning weight
+    + But: are regions actually accurate here? How many are getting fed out/developed somewhere else?
+
+In the map below, each point represents a zip code (averaged over all contemporary groups and all years post-1190)
+
+```{r pwg_map, fig.width=8.76, fig.height=5.4}
+
+cg_regions %>% 
+  mutate(year = as.integer(year)) %>% 
+  filter(year >= 1990) %>% 
+  filter(n_animals > 4) %>% 
+  filter(trait == "pwg") %>%
+  group_by(zip) %>% 
+  mutate(sz = sum(n_animals),
+         clr = mean(value)) %>% 
+  ungroup() %>% 
+  select(sz, clr, var, trait, lat, lng) %>% 
+  distinct() %>% 
+ # sample_frac(0.4) %>% 
+  #filter(year %in% c(2015, 2016)) %>% 
+  solutions_map(
+  effect_var = "cg_sol",
+  trait_var = "pwg",
+  color_var = clr,
+  size_var = sz,
+  size_range = c(2, 8),
+  plot_title = "Post-weaning gain contemporary group solutions\n(1990-present)"
+)
+
+ggsave(here::here("figures/pwg_cg.solutions_map_post1990.png"), width = 8.76, height = 5.4)
+```
+
+```{r pwg_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
+
+
+cg_regions %>%
+  filter(year >= 1990) %>%
+  filter(n_animals >= 4) %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  solutions_boxswarm(
+    effect_var = "cg_sol",
+    trait_var = "pwg",
+    y_title = "CG value",
+    plot_title = "Post-weaning gain CG solutions across regions\n(1990-present)"
+  )
+
+ggsave(here::here("figures/pwg_cg.solutions_boxswarm_post1990.png"), width = 8.76, height = 5.4)
+```
+
+
+### Breeding values
+
+```{r pwg_bv, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
+
+
+animal_regions %>%
+  filter(year >= 1990) %>% 
+  filter(n_animals >= 4) %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  by_cg(trait_var = "pwg", effect_var = "bv_sol") %>%
+  solutions_boxswarm(
+    effect_var = "bv_sol",
+    trait_var = "pwg",
+    y_title = "Breeding value",
+    plot_title = "Post-weaning gain breeding values across regions\n(1990-present)"
+  )
+
+ggsave(
+  here::here("figures/pwg_bv.solutions_boxswarm_post1990.png"),
+  width = 8.76,
+  height = 5.4
+)
+```
+
+# Commentary
+
+
+We find an `r round(max(ww_sum$median_weight)-min(ww_sum$median_weight), digits = 1)` lb. difference between the median recorded weaning weight in the highest ranked region (`r ww_sum %>% arrange(desc(median_weight)) %>% slice(1) %>% pull(desc)`) and the lowest ranked region (`r ww_sum %>% arrange(median_weight) %>% slice(1) %>% pull(desc)`). Similarly, we find an `r round(max(pwg_sum$median_weight)-min(pwg_sum$median_weight), digits = 1)` lb. difference between the median recorded post-weaning gain in the highest ranked region ((`r pwg_sum %>% arrange(desc(median_weight)) %>% slice(1) %>% pull(desc)`)) and the lowest ranked region (`r pwg_sum %>% arrange(median_weight) %>% slice(1) %>% pull(desc)`).  
+
+However, compared to weaning weight which appears to be normally distributed *[do I need to actually test this]*, the distribution of post-weaning gain measurements appears to be bimodal regardless of region. This likely reflects increased variation in management post-weaning.

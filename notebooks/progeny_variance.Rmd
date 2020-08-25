@@ -1,0 +1,405 @@
+---
+title: "AI sire inter-region variance"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+    code_folding: hide 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(rlang)
+library(glue)
+library(ggplot2)
+library(lubridate)
+library(forcats)
+library(magrittr)
+library(purrr)
+library(tidylog)
+
+source(here::here("source_functions/ped.R"))
+source(here::here("source_functions/region_key.R"))
+
+options(scipen=999)
+```
+
+# Notes & questions
+
+# Setup
+
+```{r}
+animal_regions <- readr::read_rds(here::here("data/derived_data/animal_regions.rds"))
+```
+
+
+```{r}
+ped <- pull_ped(refresh = FALSE)
+
+```
+
+
+## Data generation
+
+* Create subset of `animal_regions`
+
+```{r}
+calves_start <-
+  animal_regions %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  filter(trait == "ww" & var == "weight") %>% 
+  filter(year >= 1990) %>%
+  left_join(
+    ped %>% 
+      select(
+        id_new, 
+        sire_id,
+        dam_id,
+        birth_year
+      )
+  ) 
+```
+
+* Using `calves_start`, summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
+* Remove region/sire combinations with only one unique contemporary group
+* Remove region/sire combinations with fewer than 50 calves
+
+```{r}
+
+sire_tally <- 
+  calves_start %>% 
+  group_by(sire_id, region) %>% 
+  # For each sire/region combination, 
+  # summarize number of calves, number of CGs, mean WW
+  summarise(
+    n = n(),
+    n_cg = n_distinct(cg_new),
+    mean_ww = mean(value), 
+    median_ww = median(value)
+  ) %>% 
+  ungroup() %>% 
+  # Discard rows where sire has only one CG in the region
+  filter(n_cg > 1) %>% 
+  # Discard rows where sire has fewer than 50 calves in the region
+  filter(n >= 50) 
+  
+  
+```
+
+* For each sire, compare each retained region with each other retained region (with swap duplicates)
+
+```{r}
+
+sire_pair <-
+  arrangements::permutations(x = c(1:9), k = 2) %>% 
+  as_tibble() %>% 
+  filter(V1 != V2) %>% 
+  # Add column of mean weight for first region
+  left_join(sire_tally %>%
+              select(sire_id,
+                     region,
+                     #mean_v1 = mean_ww,
+                     median_v1 = median_ww
+                     ),
+            by = c("V1" = "region")) %>%
+  # Add column of mean weight for second region
+  left_join(
+    sire_tally %>%
+      select(sire_id,
+             region,
+             #mean_v2 = mean_ww
+             median_v2 = median_ww
+             ),
+    by = c("V2" = "region", "sire_id" = "sire_id")
+  ) %>% 
+  select(sire_id, everything()) %>% 
+  # Retain only rows with mean_weight in both comparison regions
+  filter_at(vars(contains("median")), all_vars(!is.na(.))) %>% 
+  mutate(change = median_v1 - median_v2) 
+
+```
+
+* For each sire, compare the mean of calves in selected region against mean of all calves retained in `calves_start`
+
+```{r}
+
+baseline_change <-
+sire_pair %>% 
+  select(sire_id, V1, median_v1) %>% 
+  distinct() %>% 
+  left_join(
+    calves_start %>% 
+      group_by(sire_id) %>% 
+      summarise(median_overall = median(value)) %>% 
+      ungroup()
+  ) %>% 
+  mutate(change = median_v1 - median_overall)
+
+  
+```
+
+# Comparing against baseline
+
+How many sires with region where calves are at least 50 pounds lighter than the overall average weight of their calves?
+
+```{r}
+baseline_change %>% 
+  filter(change < -50) %>% 
+  n_distinct(.[["sire_id"]]) %>% 
+  scales::comma()
+
+```
+
+Which regions most often fall far below sire baseline?
+
+```{r}
+
+baseline_change %>% 
+  filter(change < -50) %>% 
+  group_by(V1) %>% 
+  tally() %>% 
+  rename(Region = V1) %>% 
+  arrange(desc(n))
+
+```
+
+
+```{r, fig.width=13, fig.height=9}
+
+baseline_change  %>% 
+  left_join(
+    region_key %>% 
+      select(
+        V1 = num, 
+        desc
+      )
+  ) %>%
+  ggplot(aes(x = median_overall,
+             y = median_v1,
+             #size = n_total)
+         )) +
+  geom_point(aes(color = change),
+            # size = 5,
+             alpha = 0.6) +
+  lims(x = c(425, 750),
+       y = c(425, 750)) +
+  geom_abline(slope = 1,
+              linetype = "twodash",
+              #size = 3
+              ) +
+  viridis::scale_color_viridis(direction = 1) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      size = 28,
+      face = "italic"),
+    plot.subtitle = element_text(
+      size = 20,
+      margin = margin(
+        t = 0,
+        r = 0,
+        b = 13,
+        l = 0
+      )
+    ),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 18),
+    strip.text = element_text(size = 16)
+  ) +
+  facet_wrap(~desc) +
+  labs(
+    x = "Median weaning weight of sire's calves in all regions",
+    y = glue("Median weaning weight of sire's\ncalves in comparison region"),
+    title = "Many AI sires perform inconsistently across regions",
+    color = "Change",
+    fill = "Count"
+  )
+
+ggsave(
+  here::here("figures/ww.sire_var.medianvall_point.png"),
+  width = 13,
+  height = 9
+)
+
+```
+
+
+# Inter-region spread
+
+What is the distribution of across-region spread? 
+
+```{r}
+baseline_change %>% 
+  group_by(sire_id) %>% 
+  summarise(spread = max(median_v1)-min(median_v1)) %>% 
+  ungroup() %>% 
+  summarise(
+    median_spread = median(spread),
+    min_spread = min(spread),
+    max_spread = max(spread),
+    sd_spread = sd(spread)
+    )
+```
+
+
+```{r, fig.width=12, fig.height=8}
+baseline_change %>% 
+  group_by(sire_id) %>% 
+  summarise(spread = max(median_v1)-min(median_v1)) %>% 
+  arrange(desc(spread)) %>% 
+  ggplot(aes(x = spread)) +
+  geom_histogram(bins = 25) +  theme_classic() +
+  theme(
+    plot.title = element_text(
+      size = 28,
+      face = "italic"),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 18),
+  ) +
+  geom_vline(aes(xintercept = median(spread))) +
+  scale_x_continuous(breaks = seq(from = 0, to = 300, by = 25)) +
+  labs(
+    x = "Inter-region spread",
+    y = "Count",
+    title = "The median inter-region spead of\nweaning weights for AI sires is 45 lbs"
+  )
+    
+
+```
+
+
+```{r}
+
+baseline_change %>% 
+  group_by(sire_id) %>% 
+  summarise(spread = max(median_v1)-min(median_v1)) %>% 
+  arrange(desc(spread))
+
+```
+
+
+# Compare sire performance in High Plains against performance in every other region
+
+```{r, fig.width=13, fig.height=8}
+
+sire_pair %>% 
+  filter(V1 == 3) %>% 
+  left_join(
+    region_key %>% 
+      select(
+        V1 = num, 
+        desc_v1 = desc
+      )
+  ) %>% 
+  left_join(
+    region_key %>% 
+      select(
+        V2 = num, 
+        desc_v2 = desc
+      )
+  ) %>%
+  ggplot(aes(x = median_v1,
+             y = median_v2,
+             #size = n_total)
+         )) +
+  geom_point(aes(color = change),
+             size = 3,
+             alpha = 0.75) +
+  lims(x = c(425, 750),
+       y = c(425, 750)) +
+  viridis::scale_color_viridis(option = "magma", direction = -1, end = 0.8) +
+  geom_abline(slope = 1,
+              linetype = "twodash",
+              #size = 3
+              ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      size = 28,
+      face = "italic"),
+    plot.subtitle = element_text(
+      size = 20,
+      margin = margin(
+        t = 0,
+        r = 0,
+        b = 13,
+        l = 0
+      )
+    ),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    axis.title = element_text(size = 22),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(size = 18),
+    strip.text = element_text(size = 16)
+  ) +
+  facet_wrap(~desc_v2) +
+  labs(
+    y = glue("Median weaning weight of calves \n in comparison region"),
+    x = glue("Median weaning weight of calves \n in High Plains"),
+    title = "Many AI sires perform inconsistently across regions",
+    color = "Change"
+  )
+
+ggsave(
+  here::here("figures/ww.sire_var.3vall_point.png"),
+  width = 12,
+  height = 8
+)
+```
+
+# Commentary
+
+Among beef cattle producers, it is common knowlege that some AI sires vary in performance across regions. However, this variation is often only anecdotal. Therefore, we asked:
+
+* For AI sires with calves born in multiple regions, how much does the median weight of their calves vary from region to region? 
+* Is the difference in mean weight of calves consistent between sires or are some sires less "robust", showing more variability across regions?
+
+Sires with at least 50 calves and at least two unique contemporary groups in two or more regions were retained for analysis (n = `r scales::comma(length(unique(baseline_change$sire_id)))`).
+
+Of sires with at least 50 calves in multiple regions,`r baseline_change %>% filter(change < -50) %>% summarise(n_distinct(sire_id)) %>% pull(1) %>% scales::comma()` had at least one region in which the median weaning weight of calves in that region was at least 50 pounds lower than the median weaning weight of their calves across all regions. Most often this region was the Fescue Belt, occurring > 60% more often than the second ranked region (the Southeast). The median inter-region spread of weaning weights was about 45 pounds, though 5 sires had an inter-region spread greater than or equal to 200 lbs. 
+
+

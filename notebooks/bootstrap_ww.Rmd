@@ -1,0 +1,204 @@
+---
+title: "Bivariate bootstrapping: weaning weight"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(glue)
+library(stringr)
+library(magrittr)
+library(tibble)
+library(purrr)
+library(ggplot2)
+library(rlang)
+library(tidylog)
+
+
+source(here::here("source_functions/melt_aireml.R"))
+source(here::here("source_functions/calculate_heritability.R"))
+source(here::here("source_functions/read_bootstrap_corrs.R"))
+source(here::here("source_functions/region_key.R"))
+
+```
+
+
+# Notes & questions
+
+# Setup
+
+## `bootstrap_ww_start.R`
+
+* Filter down `animal_regions` to form sampling pool
+    + Retain only rows where `var` is equal to "weight"
+    + Retain only rows where `trait` is equal to "ww"
+    + Remove rows where `year` is before 1990
+    + Remove rows where `n_animals` is fewer than 15
+    + Remove single sire single dam contemporary groups
+    
+## `bootstrap_ww_sample.R`
+
+* Using `sample_until.R`, selects zip codes to be retained
+* Extracts animals in `start` matching selected zip codes
+* Writes data file and pedigree file for the selected region and iteration 
+
+## Resulting data
+
+```{r, message=FALSE, warning=FALSE}
+
+corr_iters <-
+  tibble(iter = c(1:10)) %>% 
+  expand(iter, region = c(1, 2, 5, 7, 8, 9)) %>% 
+  mutate(data = 
+           purrr::map2( .x = iter, .y = region,
+             ~ read_bootstrap_corrs(iteration = .x, r1 = 3, r2 = .y)
+             )
+         ) %>% 
+  unnest() %>% 
+  left_join(
+    region_key %>% 
+      select(region = num,
+             desc)
+  ) %>% 
+  mutate(run = as.character(glue("iter{iter}_3v{region}"))) %>% 
+  select(
+    iteration = iter,
+    region = desc,
+    effect_1,
+    effect_2,
+    corr,
+    run
+  )
+```
+
+```{r, message=FALSE}
+
+bootstrap_h2s <-
+  tibble(iter = c(1:10)) %>% 
+  expand(iter, region = c(1, 2, 5, 7, 8, 9)) %>% 
+  mutate(data = 
+           purrr::map2(.x = iter, .y = region, ~ read_bootstrap_covs(iteration = .x, r1 = 3, r2 = .y))) %>% 
+  unnest()
+
+```
+
+# Heritabilities
+
+```{r, eval=FALSE}
+bootstrap_h2s %>% 
+  group_by(key) %>% 
+  summarise(mean(`Direct h2`), sd(`Direct h2`), n = n())
+  
+``` 
+
+# Genetic correlations
+
+> Direct
+
+```{r}
+
+corr_iters %>% 
+  filter_at(vars(contains("effect")), all_vars(str_detect(., "direct"))) %>% 
+  mutate(region = glue("{region} (direct)")) %>% 
+  group_by(region) %>% 
+  summarise(
+    min_corr = min(corr),
+    mean_corr = mean(corr),
+    max_cor = max(corr),
+    sd_corr = sd(corr),
+    n_iter = n(),
+    range_corr = max(corr)-min(corr)) %>% 
+  arrange(desc(range_corr))
+
+```
+
+> Maternal
+
+```{r}
+corr_iters %>% 
+  filter_at(vars(contains("effect")), all_vars(str_detect(., "milk"))) %>% 
+  mutate(region = glue("{region} (milk)")) %>% 
+  group_by(region) %>% 
+  summarise(
+    min_corr = min(corr),
+    mean_corr = mean(corr),
+    max_cor = max(corr),
+    sd_corr = sd(corr),
+    n_iter = n(),
+    range_corr = max(corr)-min(corr)) %>% 
+  arrange(desc(range_corr))
+```
+
+```{r, eval=FALSE}
+corr_iters %>% 
+  filter_at(vars(contains("effect")), all_vars(str_detect(., "milk"))) %>% 
+  mutate(region = glue("{region} (milk)")) %>% 
+  select(-contains("effect")) %>% 
+  View()
+```
+
+
+```{r, eval = FALSE}
+corr_iters %>% 
+  filter_at(vars(contains("effect")), all_vars(str_detect(., "direct"))) %>% 
+  mutate(region = glue("{region} (direct)")) %>% 
+  select(-contains("effect")) %>% 
+  View()
+```
+
+
+# Correlated response
+
+["Here the correlated response ($CR_Y$) is the response of the trait in the environment (Y) in which it is expected to perform, given selection in a different environment (X), while the direct response ($R_Y$) is for selection in the environment in which the organisms will ultimately be reared."](https://www.genetics.org/content/167/4/1529)
+
+> Direct
+
+```{r}
+bootstrap_h2s %>% 
+  mutate(which = if_else(key == "High Plains", "hp", "other")) %>% 
+  select(which, h = `Direct h2`, run) %>% 
+  mutate(h = sqrt(h)) %>% 
+  pivot_wider(names_from = which,
+              values_from = h,
+              id_cols = run) %>% 
+  left_join(
+    corr_iters %>% 
+      filter_at(vars(contains("effect")), all_vars(str_detect(., "direct"))) %>% 
+      select(corr, run)
+  ) %>% 
+  mutate(cordir_res = ((hp/other)*corr)) %>% 
+  arrange(cordir_res)
+
+```
+
+> Maternal
+
+```{r}
+bootstrap_h2s %>% 
+  mutate(which = if_else(key == "High Plains", "hp", "other")) %>% 
+  select(which, h = `Maternal h2`, run) %>% 
+  mutate(h = sqrt(h)) %>% 
+  pivot_wider(names_from = which,
+              values_from = h,
+              id_cols = run) %>% 
+  left_join(
+    corr_iters %>% 
+      filter_at(vars(contains("effect")), all_vars(str_detect(., "milk"))) %>% 
+      select(corr, run)
+  ) %>% 
+  mutate(cordir_res = ((hp/other)*corr)) %>% 
+  arrange(cordir_res) 
+
+```
+
+# Commentary
+
