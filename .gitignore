@@ -8,3 +8,4 @@ data/*
 notebooks/weather.Rmd
 notebooks/hi-lo_2v3.Rmd
 source_functions/bivariate_setup/*
+html/*
