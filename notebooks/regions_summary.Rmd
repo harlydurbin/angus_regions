@@ -33,20 +33,22 @@ options(scipen=999)
 ```{r, eval=TRUE}
 cg_regions <- 
   readr::read_rds(here::here("data/derived_data/cg_regions.rds")) %>% 
-  filter(n_animals > 1)
+  filter(year >= 1990) %>% 
+  filter(n_animals > 4) %>% 
+  filter(!region %in% c(4, 6)) 
 ```
 
 
 ```{r, eval=TRUE}
 animal_regions <- 
   readr::read_rds(here::here("data/derived_data/animal_regions.rds")) %>% 
-  filter(n_animals > 1)
+  filter(year >= 1990) %>% 
+  filter(n_animals > 4) %>% 
+  filter(!region %in% c(4, 6)) 
 ```
 
 
 # Notes & questions
-
-
 
 * Traits in values file:
     + ~~1 == BW~~
@@ -70,13 +72,11 @@ Climate regions are as follows:
 
 ![](../data/raw_data/regions.png)
 
-
 ## Number of CGs per region
 
 ```{r}
 
 cg_regions %>% 
-  filter(year >= 1990) %>% 
   group_by(trait, region, desc) %>% 
   tally() %>% 
   ungroup() %>% 
@@ -86,8 +86,9 @@ cg_regions %>%
   rename(Region = region,
          `Region description` = desc,
          `n PWG CGs` = n_pwg_CGs,
-         `n WW CGs` = n_ww_CGs)
-
+         `n WW CGs` = n_ww_CGs) %>% 
+  arrange(Region)
+  
 ```
 
 ## Number of animals per region (sum of animals per CG, stratified by region)
@@ -95,6 +96,8 @@ cg_regions %>%
 ```{r}
 cg_regions %>%
   filter(year >= 1990) %>% 
+  filter(n_animals > 4) %>% 
+  filter(!region %in% c(4, 6)) %>% 
   group_by(trait, region, desc) %>%
   summarise(n_animals = sum(n_animals)) %>%
   ungroup() %>%
@@ -106,7 +109,8 @@ cg_regions %>%
     `Region description` = desc,
     `n PWG records` = n_pwg_animals,
     `n WW records` = n_ww_animals
-  )
+  ) %>% 
+  arrange(Region)
 ```
 
 ```{r ww_sample_map, fig.width=8.76, fig.height=5.4, cache=TRUE}
@@ -121,13 +125,13 @@ plot_samples_map(
 ```
 
 
-## Records per CG
+## ~~Records per CG~~
 
 * How many contemporary groups with less than 5 animals?
     + `r cg_regions %>% filter(trait == "ww") %>% filter(n_animals < 5) %>% n_distinct() %>% scales::comma()` weaning CGs with fewer than 5 animals
     + `r cg_regions %>% filter(trait == "pwg") %>% filter(n_animals < 5) %>% n_distinct() %>% scales::comma()` yearling CGs with fewer than 5 animals
 
-```{r}
+```{r, eval=FALSE}
 cg_regions %>% 
   filter(year >= 1990) %>% 
   group_by(trait) %>% 
@@ -145,7 +149,7 @@ cg_regions %>%
 ### Binned
 
 
-```{r}
+```{r, eval = FALSE}
 cg_regions %>% 
   filter(year >= 1990) %>% 
   mutate(
@@ -203,16 +207,9 @@ cg_regions %>%
 
 ```{r, eval = TRUE}
 
-
 ww_sum <-
   cg_regions %>%
   filter(trait == "ww") %>%
-  filter(!region %in% c(4, 6)) %>% 
-  filter(year >= 1990) %>% 
-  filter(n_animals >= 4) %>% 
-  # group_by(region) %>%
-  # sample_n(100) %>%
-  # ungroup() %>%
   group_by(desc, var) %>%
   summarise(median = median(value),
             sd = sd(value)) %>%
@@ -225,11 +222,6 @@ ww_sum <-
   left_join(
     animal_regions %>%
       filter(trait == "ww") %>%
-      filter(!region %in% c(4, 6)) %>%
-      filter(year >= 1990) %>% 
-      # group_by(region) %>%
-      # sample_n(100) %>%
-      # ungroup() %>%
       group_by(desc, var) %>%
       summarise(median = median(value),
                 sd = sd(value)) %>%
@@ -254,16 +246,20 @@ ww_sum %>%
     `Phenotypic SD` = sd_weight
   ) %>% DT::datatable(options = list(pageLength = 7), rownames = FALSE, caption = "Weaning weight")
 
-
 ```
+
+
 
 ### Adjusted phenotypes
 
 ```{r ww_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
 
 animal_regions %>%
-  filter(year >= 1990) %>% 
-  filter(!region %in% c(4, 6)) %>%
+  filter(trait == "ww" & var == "weight") %>% 
+  mutate(outlier_min = mean(value)-(sd(value)*3),
+         outlier_max = mean(value)+(sd(value)*3)) %>% 
+  filter(value > outlier_min) %>% 
+  filter(outlier_max > value) %>% 
   # Don't care about n in cg for phenotype
   by_cg(trait_var = "ww", effect_var = "weight") %>%
   solutions_boxswarm(
@@ -273,13 +269,46 @@ animal_regions %>%
     plot_title = "Weaning weights across regions\n(1990-present)"
   )
 
-ggsave(
-  here::here("figures/ww_pheno.solutions_boxswarm_post1990.png"),
-  width = 8.76,
-  height = 5.4
-)
+# ggsave(
+#   here::here("figures/ww_pheno.solutions_boxswarm_post1990.png"),
+#   width = 8.76,
+#   height = 5.4
+# )
 ```
 
+```{r,eval=FALSE}
+ww_lo <- 
+  animal_regions %>% 
+  filter(region == 2) %>% 
+  filter(trait == "ww") %>% 
+  filter(var == "weight")
+
+ww_bv_lo <-
+  animal_regions %>% 
+  filter(region == 2) %>% 
+  filter(trait == "ww") %>% 
+  filter(var == "bv_sol")
+
+ww_hi <- 
+  animal_regions %>% 
+  filter(region == 3) %>% 
+  filter(trait == "ww") %>% 
+  filter(var == "weight")
+
+ww_bv_hi <-
+  animal_regions %>% 
+  filter(region == 3) %>% 
+  filter(trait == "ww") %>% 
+  filter(var == "bv_sol")
+```
+
+```{r, eval=FALSE}
+t.test(ww_lo$value, ww_hi$value)
+```
+
+```{r, eval=FALSE}
+t.test(ww_bv_lo$value, ww_bv_hi$value)
+```
 
 ### Contemporary group solutions
 
@@ -288,9 +317,6 @@ In the map below, each point represents a zip code (averaged over all contempora
 ```{r ww_map, fig.width=8.76, fig.height=5.4, echo = TRUE}
   
 cg_regions %>% 
-  filter(year >=1990) %>% 
-  filter(trait == "ww") %>%
-  filter(n_animal >= 4) %>% 
   group_by(zip) %>% 
   mutate(sz = sum(n_animals),
          clr = mean(value)) %>% 
@@ -313,9 +339,13 @@ cg_regions %>%
 ```{r ww_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
 
 cg_regions %>% 
-  filter(year >= 1990) %>% 
-  filter(!region %in% c(4, 6)) %>% 
-  filter(n_animals >= 4) %>% 
+  filter(trait == "ww" & var == "cg_sol") %>% 
+  group_by(region) %>% 
+  mutate(outlier_min = mean(value)-(sd(value)*3),
+         outlier_max = mean(value)+(sd(value)*3)) %>% 
+  ungroup() %>% 
+  filter(value > outlier_min) %>% 
+  filter(outlier_max > value) %>% 
   solutions_boxswarm(
   effect_var = "cg_sol",
   trait_var = "ww",
@@ -323,10 +353,8 @@ cg_regions %>%
   plot_title = "Weaning weight contemporary group solutions\n(1990-present)"
 )
 
-ggsave(here::here("figures/ww_cg.solutions_boxswarm_post1990.png"), width = 8.76, height = 5.4)
+#ggsave(here::here("figures/ww_cg.solutions_boxswarm_post1990.png"), width = 8.76, height = 5.4)
 ```
-
-
 
 ### Breeding values
 
@@ -334,9 +362,6 @@ ggsave(here::here("figures/ww_cg.solutions_boxswarm_post1990.png"), width = 8.76
 
 
 animal_regions %>%
-  filter(year >= 1990) %>% 
-  filter(n_animals >= 4) %>% 
-  filter(!region %in% c(4, 6)) %>% 
   by_cg(trait_var = "ww", effect_var = "bv_sol") %>% 
   solutions_boxswarm(
     effect_var = "bv_sol",
@@ -359,9 +384,6 @@ ggsave(
 ```{r ww_mat, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
 
 animal_regions %>%
-  filter(year >= 1990) %>% 
-  filter(n_animals >= 4) %>% 
-  filter(!region %in% c(4, 6)) %>% 
   by_cg(trait_var = "ww", effect_var = "mat_sol") %>%
   solutions_boxswarm(
     effect_var = "mat_sol",
@@ -384,12 +406,6 @@ animal_regions %>%
 pwg_sum <-
   cg_regions %>%
   filter(trait == "pwg") %>%
-  filter(!region %in% c(4, 6)) %>% 
-  filter(n_animals >= 4) %>% 
-  filter(year >= 1990) %>% 
-  # group_by(region) %>%
-  # sample_n(100) %>%
-  # ungroup() %>%
   group_by(desc, var) %>%
   summarise(median = median(value),
             sd = sd(value)) %>%
@@ -402,11 +418,6 @@ pwg_sum <-
   left_join(
     animal_regions %>%
       filter(trait == "pwg") %>%
-      filter(!region %in% c(4, 6)) %>%
-      filter(year >= 1990) %>% 
-      # group_by(region) %>%
-      # sample_n(100) %>%
-      # ungroup() %>%
       group_by(desc, var) %>%
       summarise(median = median(value),
                 sd = sd(value)) %>%
@@ -436,8 +447,6 @@ pwg_sum %>%
 ```{r pwg_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE, cache=TRUE}
 
 animal_regions %>% 
-  filter(year >= 1990) %>% 
-  filter(!region %in% c(4, 6)) %>% 
   by_cg(trait_var = "pwg", effect_var = "weight") %>%
   solutions_boxswarm(
     effect_var = "weight",
@@ -452,6 +461,37 @@ ggsave(
   height = 5.4
 )
 ```
+
+```{r,eval=FALSE}
+pwg_lo <- 
+  animal_regions %>% 
+  filter(region == 2) %>% 
+  filter(trait == "pwg") %>% 
+  filter(var == "weight")
+
+pwg_bv_lo <-
+  animal_regions %>% 
+  filter(region == 2) %>% 
+  filter(trait == "pwg") %>% 
+  filter(var == "bv_sol")
+
+pwg_hi <- 
+  animal_regions %>% 
+  filter(region == 9) %>% 
+  filter(trait == "pwg") %>% 
+  filter(var == "weight")
+
+pwg_bv_hi <-
+  animal_regions %>% 
+  filter(region == 9) %>% 
+  filter(trait == "pwg") %>% 
+  filter(var == "bv_sol")
+```
+
+```{r, eval=FALSE}
+t.test(pwg_lo$value, pwg_hi$value)
+```
+
 
 ### Contemporary group solutions
 
@@ -530,6 +570,10 @@ ggsave(
 ```
 
 # Commentary
+
+```{r}
+
+```
 
 
 We find an `r round(max(ww_sum$median_weight)-min(ww_sum$median_weight), digits = 1)` lb. difference between the median recorded weaning weight in the highest ranked region (`r ww_sum %>% arrange(desc(median_weight)) %>% slice(1) %>% pull(desc)`) and the lowest ranked region (`r ww_sum %>% arrange(median_weight) %>% slice(1) %>% pull(desc)`). Similarly, we find an `r round(max(pwg_sum$median_weight)-min(pwg_sum$median_weight), digits = 1)` lb. difference between the median recorded post-weaning gain in the highest ranked region ((`r pwg_sum %>% arrange(desc(median_weight)) %>% slice(1) %>% pull(desc)`)) and the lowest ranked region (`r pwg_sum %>% arrange(median_weight) %>% slice(1) %>% pull(desc)`).  
