@@ -1,0 +1,246 @@
+---
+title: "Untitled"
+author: "Harly Durbin"
+date: "8/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+library(magrittr)
+library(glue)
+library(tidylog)
+
+source(here::here("source_functions/sample_until.R"))
+source(here::here("source_functions/three_gen.R"))
+
+region_key <-
+  tribble(~num, ~abbrv, ~desc,
+          2, "SE", "Southeast",
+          8, "FB", "Fescue Belt",
+          3, "HP", "High Plains", 
+          5, "AP", "Arid Prairie",
+          7, "FM", "Forested Mountains", 
+          1, "D", "Desert",
+          9, "UMWNE", "Upper Midwest & Northeast")
+
+```
+
+# Setup
+
+```{r}
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+ped <- read_rds(here::here("data/derived_data/ped.rds"))
+```
+
+
+
+```{r}
+
+start <-
+  animal_regions %>%
+  # Only weights
+  filter(var == "weight") %>%
+  ungroup() %>% 
+  # Keep only contemporary groups with 15 or more animals
+  filter(n_animals >= 15) %>%
+  left_join(
+    ped %>% 
+      select(id_new, sire_id, dam_id)
+  ) %>% 
+  group_by(cg_new) %>%
+  # Remove single sire single dam contemporary groups
+  filter(n_distinct(sire_id) > 1) %>%
+  filter(n_distinct(dam_id) > 1) %>%
+  ungroup() %>% 
+  group_by(id_new) %>%
+  # Keep only if they have ww and pwg so I can use the same animals for both
+  filter(n_distinct(trait) == 2) %>%
+  ungroup()
+
+```
+
+Do I have enough to sample from animals that have both WW and PWG?
+
+```{r}
+
+start %>% 
+  group_by(desc, trait) %>% 
+  tally()
+```
+
+```{r}
+start_ww <- 
+  start %>% 
+  filter(trait == "ww") %>% 
+  distinct(cg_new)
+
+start_pwg <- 
+  start %>% 
+  filter(trait == "pwg") %>% 
+  distinct(cg_new)
+```
+
+
+
+# Sample
+
+```{r, dkeep}
+# Region 1: Desert
+
+
+d_keep <-
+  start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% start_pwg$cg_new) %>% 
+  filter(region == 1) %>% 
+  sample_until(limit = 50000, var = cg_new, region_id = 1)
+
+
+d_keep %>% 
+  summarise(sum(n), 
+            n_distinct(cg_new))
+
+```
+
+```{r}
+
+# Region 2: Southeast
+
+se_keep <-
+  start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% start_pwg$cg_new) %>% 
+  filter(region == 2) %>% 
+  sample_until(limit = 50000, var = cg_new, region_id = 2)
+
+
+se_keep %>% 
+  summarise(sum(n), 
+            n_distinct(cg_new))
+```
+
+```{r}
+
+# Region 3: High Plains
+
+hp_keep <-
+  start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% start_pwg$cg_new) %>% 
+  filter(region == 3) %>% 
+  sample_until(limit = 50000, var = cg_new, region_id = 3)
+
+hp_keep %>% 
+  summarise(sum(n), 
+            n_distinct(cg_new))
+```
+
+```{r}
+
+# Region 5: Arid Prairie
+
+ap_keep <-
+  start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% start_pwg$cg_new) %>% 
+  filter(region == 5) %>% 
+  sample_until(limit = 50000, var = cg_new, region_id = 5)
+
+ap_keep %>% 
+  summarise(sum(n), n_distinct(cg_new))
+
+```
+
+```{r}
+# Region 7: Forested Mountains
+
+fm_keep <-
+  start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% start_pwg$cg_new) %>% 
+  filter(region == 7) %>% 
+  sample_until(limit = 50000, var = cg_new, region_id = 7)
+
+fm_keep %>% 
+  summarise(sum(n), 
+            n_distinct(cg_new))
+```
+
+```{r}
+# Region 8: Fescue Belt
+
+fb_keep <-
+  start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% start_pwg$cg_new) %>% 
+  filter(region == 8) %>% 
+  sample_until(limit = 50000, var = cg_new, region_id = 8)
+
+fb_keep %>% 
+  summarise(sum(n), 
+            n_distinct(cg_new))
+```
+
+```{r}
+# Region 9: Upper Midwest & NE
+
+umwne_keep <-
+  start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% start_pwg$cg_new) %>% 
+  filter(region == 9) %>% 
+  sample_until(limit = 50000, var = cg_new, region_id = 9)
+
+umwne_keep %>% 
+  summarise(sum(n), 
+            n_distinct(cg_new))
+```
+
+# Bind sampled data
+
+```{r}
+all_keep <- 
+  bind_rows(d_keep, se_keep, hp_keep, ap_keep, fm_keep, fb_keep, umwne_keep) %>% 
+  distinct()
+```
+
+# Ped
+
+```{r}
+start %>% 
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% all_keep$cg_new) %>% 
+  select(id_new) %>% 
+  left_join(ped %>%
+              select(1:3)) %>% 
+  three_gen(full_ped = ped) %>% 
+  write_delim(
+    path = here::here(
+      "data/f90/190912_allregion_pwg/ped.allregion_pwg.txt"
+    ),
+    delim = " ",
+    col_names = FALSE
+  )
+```
+
+```{r}
+start %>%
+  filter(trait == "pwg") %>% 
+  filter(cg_new %in% all_keep$cg_new) %>%
+  select(region, id_new, cg_new, value) %>%
+  spread(region, value) %>%
+  mutate_all(~ replace_na(., "0")) %>%
+  write_delim(here::here(
+    glue("data/f90/190912_allregion_pwg/data.allregion_pwg.txt")
+  ),
+  delim = " ",
+  col_names = FALSE)
+```
+

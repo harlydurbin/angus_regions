@@ -1,0 +1,250 @@
+---
+title: "Untitled"
+author: "Harly Durbin"
+date: "8/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+library(magrittr)
+library(tidylog)
+
+source(here::here("source_functions/sample_until.R"))
+source(here::here("source_functions/three_gen.R"))
+
+
+```
+
+```{r}
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+ped <- read_rds(here::here("data/derived_data/ped.rds"))
+```
+
+
+```{r}
+start <-
+  animal_regions %>%
+  # Only weaning weights
+  filter(trait == "ww") %>%
+  filter(var == "weight") %>%
+  # Only region 3 or 8
+  filter(region %in% c(3, 8)) %>%
+  left_join(ped) %>%
+  # Keep only contemporary groups with 15 or more animals
+  filter(n_animals >= 15) %>%
+  group_by(cg_new) %>%
+  # Remove single sire single dam contemporary groups
+  filter(n_distinct(sire_id) > 1) %>%
+  filter(n_distinct(dam_id) > 1) %>%
+  ungroup() %>%
+  group_by(zip) %>%
+  # At least 10 years of data
+  filter(n_distinct(year) >= 10) %>%
+  ungroup() %>% 
+  mutate(
+    helper = 
+      case_when(
+        herd_state %in% c("CA", "WA", "OR", "PA", "NY", "WI", "NJ", "MA", "MD", "DE", "MI", "CT", "RI", "NH", "NE") & region == 8 ~ "drop",
+        TRUE ~ "keep"
+      )) %>% 
+  filter(helper == "keep")
+
+```
+
+```{r}
+prolific <-
+  start %>% 
+  # How many calves per region does each sire have?
+  group_by(sire_id, region) %>%
+  tally() %>%
+  ungroup() %>%
+  group_by(sire_id) %>%
+  filter(n_distinct(region) == 2) %>% 
+  ungroup() %>% 
+  tidyr::pivot_wider(
+    id_cols = c("sire_id"),
+    names_from = region,
+    values_from = n,
+    names_prefix = "n_"
+  ) %>% 
+  mutate(total = n_3 + n_8) %>% 
+  # At least 100 calves in each region
+  filter(n_3 >= 100) %>% 
+  filter(n_8 >= 100) %>% 
+  arrange(desc(total))
+```
+
+```{r}
+prol_zips <-
+  prolific %>% 
+  left_join(start) %>% 
+  select(region, zip) %>% 
+  distinct()
+```
+
+```{r}
+prol_zips %>% 
+  group_by(region) %>% 
+  tally(sort = TRUE)
+```
+
+```{r}
+hp_keep <-
+  cg_regions %>% 
+  filter(trait == "ww") %>% 
+  filter(cg_new %in% start$cg_new) %>% 
+  filter(zip %in% prol_zips$zip & region == 3) %>% 
+  group_by(zip) %>%
+  summarise(n_years = n_distinct(year),
+            n_records = sum(n_animals)) %>% 
+  ungroup() %>% 
+  # summarise(sum(n_records))
+  sample_until(limit = 99000, region_id = 3)
+
+
+hp_keep %>% 
+  summarise(sum(n_records), 
+            n_distinct(zip))
+```
+
+
+```{r}
+
+fb_keep <-
+  cg_regions %>% 
+  filter(trait == "ww") %>% 
+  filter(cg_new %in% start$cg_new) %>% 
+  filter(zip %in% prol_zips$zip & region == 8) %>% 
+  group_by(zip) %>%
+  summarise(n_years = n_distinct(year),
+            n_records = sum(n_animals)) %>% 
+  ungroup() %>% 
+  # summarise(sum(n_records))
+  sample_until(limit = 100000, region_id = 8)
+
+
+fb_keep %>% 
+  summarise(sum(n_records), 
+            n_distinct(zip))
+
+```
+
+```{r}
+hp_fb <- 
+  bind_rows(hp_keep, fb_keep) %>% 
+  distinct()
+```
+
+```{r}
+start %>% 
+  filter(zip %in% hp_fb$zip) %>% 
+  group_by(herd_state) %>% 
+  tally(sort = TRUE)
+```
+
+```{r}
+start %>% 
+  filter(zip %in% hp_fb$zip) %>% 
+  group_by(sire_id, region) %>% 
+  tally(sort = TRUE) %>% 
+  ungroup() %>% 
+  group_by(sire_id) %>% 
+  filter(n_distinct(region) == 2) %>% 
+  ungroup() %>% 
+  tidyr::pivot_wider(
+    id_cols = c("sire_id"),
+    names_from = region,
+    values_from = n,
+    names_prefix = "n_"
+  ) %>% 
+  mutate(total = n_3 + n_8) %>% 
+  arrange(desc(total))
+```
+
+
+```{r}
+
+start %>% 
+  filter(zip %in% hp_fb$zip) %>% 
+  select(region, id_new, cg_new, value) %>% 
+  spread(region, value) %>% 
+  mutate_all(~ replace_na(., "0")) %>% 
+  arrange(`3`) %>% 
+  write_delim(here::here("data/f90/190812_3v8/data.HP_FB.txt"),
+              delim = " ",
+              col_names = FALSE)
+
+
+```
+
+
+```{r}
+start %>% 
+  filter(zip %in% hp_fb$zip) %>% 
+  select(id_new) %>% 
+  left_join(ped %>%
+              select(1:3)) %>% 
+  three_gen(full_ped = ped) %>% 
+  distinct() %>% 
+  write_delim(
+    here::here("data/f90/190812_3v8/ped.HP_FB.txt"),
+    delim = " ",
+    col_names = FALSE
+  )
+
+```
+
+```{r}
+## ----univariate data-----------------------------------------------------
+
+start %>% 
+  filter(zip %in% hp_fb$zip) %>% 
+  mutate(key = 
+           case_when(
+             region == 8 ~ "FB",
+             region == 3 ~ "HP"
+           )) %>% 
+  select(key, id_new, cg_new, value) %>% 
+  group_by(key) %>% 
+  group_walk(~ write_delim(.x,
+                           path = here::here(
+                             glue::glue("data/f90/190812_3v8/{.y}/data.{.y}.txt")
+                             ),
+                           delim = " ",
+                           col_names = FALSE))
+```
+
+
+```{r}
+start %>% 
+  filter(zip %in% hp_fb$zip) %>% 
+  mutate(key = 
+           case_when(
+             region == 8 ~ "FB",
+             region == 3 ~ "HP"
+           )) %>% 
+  select(key, id_new) %>% 
+  left_join(ped %>%
+              select(1:3)) %>% 
+  group_by(key) %>%
+  group_map( ~ three_gen(df = .x, full_ped = ped), keep = TRUE) %>%
+  set_names(c("FB", "HP")) %>% 
+  iwalk(~ write_delim(
+    .x,
+    path = here::here(glue::glue(
+      "data/f90/190812_3v8/{.y}/ped.{.y}.txt"
+    )),
+    delim = " ",
+    col_names = FALSE
+  ))
+
+
+```
+

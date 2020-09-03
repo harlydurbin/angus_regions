@@ -24,7 +24,6 @@ library(magrittr)
 library(purrr)
 library(tidylog)
 
-source(here::here("source_functions/ped.R"))
 source(here::here("source_functions/region_key.R"))
 
 options(scipen=999)
@@ -34,36 +33,12 @@ options(scipen=999)
 
 # Setup
 
-```{r}
-animal_regions <- readr::read_rds(here::here("data/derived_data/animal_regions.rds"))
-```
-
-
-```{r}
-ped <- pull_ped(refresh = FALSE)
-
-```
-
-
-## Data generation
-
 * Create subset of `animal_regions`
 
 ```{r}
 calves_start <-
-  animal_regions %>% 
-  filter(!region %in% c(4, 6)) %>% 
-  filter(trait == "ww" & var == "weight") %>% 
-  filter(year >= 1990) %>%
-  left_join(
-    ped %>% 
-      select(
-        id_new, 
-        sire_id,
-        dam_id,
-        birth_year
-      )
-  ) 
+  readr::read_rds(here::here("data/derived_data/import_regions/animal_regions.rds")) %>% 
+  filter(trait == "ww" & var == "weight")
 ```
 
 * Using `calves_start`, summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
@@ -92,6 +67,7 @@ sire_tally <-
   
 ```
 
+
 * For each sire, compare each retained region with each other retained region (with swap duplicates)
 
 ```{r}
@@ -100,32 +76,48 @@ sire_pair <-
   arrangements::permutations(x = c(1:9), k = 2) %>% 
   as_tibble() %>% 
   filter(V1 != V2) %>% 
-  # Add column of mean weight for first region
+  # Add column of median weight for first region
   left_join(sire_tally %>%
               select(sire_id,
                      region,
-                     #mean_v1 = mean_ww,
                      median_v1 = median_ww
                      ),
             by = c("V1" = "region")) %>%
-  # Add column of mean weight for second region
+  # Add column of median weight for second region
   left_join(
     sire_tally %>%
       select(sire_id,
              region,
-             #mean_v2 = mean_ww
              median_v2 = median_ww
              ),
     by = c("V2" = "region", "sire_id" = "sire_id")
   ) %>% 
   select(sire_id, everything()) %>% 
   # Retain only rows with mean_weight in both comparison regions
-  filter_at(vars(contains("median")), all_vars(!is.na(.))) %>% 
+  filter_at(vars(contains("median")), all_vars(!is.na(.))) %>%
+  # Calculate the difference between medians
   mutate(change = median_v1 - median_v2) 
 
 ```
 
-* For each sire, compare the mean of calves in selected region against mean of all calves retained in `calves_start`
+```{r}
+sire_pair %>% 
+  select(sire_id, V1, V2) %>% 
+  tidyr::pivot_longer(cols = c("V1", "V2")) %>% 
+  select(-name) %>% 
+  distinct() %>% 
+  group_by(sire_id) %>% 
+  summarise(n_regions = n_distinct(value)) %>% 
+  ungroup() %>% 
+  arrange(desc(n_regions)) %>% 
+  group_by(n_regions) %>% 
+  summarise(n_sires = n_distinct(sire_id)) %>% 
+  ungroup() %>% 
+  mutate(percent = n_sires/sum(n_sires))
+```
+
+
+* For each sire, compare the median of calves in selected region against mean of all calves retained in `calves_start`
 
 ```{r}
 
@@ -236,7 +228,7 @@ baseline_change  %>%
   )
 
 ggsave(
-  here::here("figures/ww.sire_var.medianvall_point.png"),
+  here::here("figures/progeny_variance/ww.sire_var.medianvall_point.post_filter.png"),
   width = 13,
   height = 9
 )
@@ -259,6 +251,14 @@ baseline_change %>%
     max_spread = max(spread),
     sd_spread = sd(spread)
     )
+```
+
+```{r}
+baseline_change %>% 
+  group_by(sire_id) %>% 
+  summarise(spread = max(median_v1)-min(median_v1)) %>% 
+  ungroup() %>% 
+  filter(spread >= 120.8989)
 ```
 
 
@@ -293,7 +293,7 @@ baseline_change %>%
   labs(
     x = "Inter-region spread",
     y = "Count",
-    title = "The median inter-region spead of\nweaning weights for AI sires is 45 lbs"
+    title = "The median inter-region spead of\nweaning weights for AI sires is ~ 40 lbs"
   )
     
 
@@ -385,7 +385,7 @@ sire_pair %>%
   )
 
 ggsave(
-  here::here("figures/ww.sire_var.3vall_point.png"),
+  here::here("figures/progeny_variance/ww.sire_var.3vall_point.postfilter.png"),
   width = 12,
   height = 8
 )
