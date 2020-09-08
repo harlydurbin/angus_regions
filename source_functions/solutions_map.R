@@ -13,9 +13,6 @@ solutions_map <-
     
     df %>%
       filter(var == effect_var & trait == trait_var) %>%
-      # group_by(trait) %>%
-     # sample_frac(0.1) %>%
-      # ungroup %>%
       ggplot(aes(
         x = lng,
         y = lat,

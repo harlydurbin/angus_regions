@@ -6,7 +6,7 @@ by_cg <-
     df %>% 
       filter(trait == trait_var, var == effect_var) %>% 
       group_by(cg_new) %>% 
-      mutate(value = mean(value)) %>% 
+      summarise(value = mean(value)) %>% 
       ungroup() %>% 
       select(-id_new, -full_reg) %>% 
       distinct()

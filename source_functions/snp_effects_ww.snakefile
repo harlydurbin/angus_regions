@@ -22,7 +22,6 @@ rule format_map:
     shell:
         """
         awk '{{print $5, $2, $3, $4}}' {input.master_map} &> {output.format_map}
-
         """
 rule hp_sample:
     resources:

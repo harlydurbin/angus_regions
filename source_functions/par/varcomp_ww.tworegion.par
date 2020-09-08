@@ -1,0 +1,53 @@
+#header: Animal cg region_3 region_other
+DATAFILE
+data.txt
+TRAITS
+3 4
+FIELDS_PASSED TO OUTPUT
+
+WEIGHT(S)
+
+RESIDUAL_VARIANCE
+1500 0
+0 1500
+# contemporary group
+EFFECT
+2 2 cross alpha
+# animal effect
+EFFECT
+1 1 cross alpha
+RANDOM
+animal
+OPTIONAL
+mat mpe
+FILE
+ped.txt
+FILE_POS
+1 2 3 0 0
+PED_DEPTH
+3
+INBREEDING
+pedigree
+(CO)VARIANCES
+800 0.01 -100 0.01
+0.01 800 0.01 -200
+-100 0.01 300 0.01
+0.01 -200 0.01 300
+(CO)VARIANCES_MPE
+200 0.01
+0.01 200
+OPTION residual
+OPTION cat 0 0
+OPTION sol se
+OPTION minfreq 0.01
+OPTION use_yams
+OPTION fact_one file
+OPTION sex_chr 30
+OPTION excludeCHR
+OPTION map_file ../../../map_file.50k.txt
+# G_eff1_eff2_trt1_trt2
+OPTION se_covar_function d1d2 G_2_2_1_2/(G_2_2_1_1*G_2_2_2_2)**0.5
+OPTION se_covar_function m1m2 G_3_3_1_2/(G_3_3_1_1*G_3_3_2_2)**0.5
+OPTION se_covar_function d1m1 G_2_3_1_1/(G_2_2_1_1*G_3_3_1_1)**0.5
+OPTION se_covar_function d2m2 G_2_3_2_2/(G_2_2_2_2*G_3_3_2_2)**0.5
+OPTION seed 817 712

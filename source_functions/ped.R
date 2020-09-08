@@ -51,7 +51,7 @@ pull_ped <-
     }
 
     else {
-      read_rds(here::here("data/derived_data/ped.rds"))
+      read_rds(here::here("data/derived_data/import_regions/ped.rds"))
 
     }
 
