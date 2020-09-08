@@ -1,0 +1,32 @@
+---
+title: "Memory tracking"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    df_print: paged
+    code_folding: show
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(tidyr)
+library(lubridate)
+
+source(here::here("source_functions/psrecord_summary.R"))
+```
+
+# `gibbs2f90`
+
+```{r}
+usage_summary(process = "varcomp_ww", keyword = "gibbs2f90")
+```
+
+```{r}
+usage_facets(process = "varcomp_ww", keyword = "gibbs2f90")
+```

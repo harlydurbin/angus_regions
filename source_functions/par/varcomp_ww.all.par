@@ -34,8 +34,7 @@ pedigree
 -250 0.01 350 0.01
 0.01 -200 0.01 300
 (CO)VARIANCES_MPE
-200 0.01
-0.01 200
+
 OPTION residual
 OPTION sol se
 OPTION conv_crit 1e-12

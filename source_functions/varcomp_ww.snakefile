@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=125 -j 24 --config &> log/snakemake_log/varcomp_ww/200907.varcomp_ww.log &
+# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=120 -j 24 --config --until gibbs &> log/snakemake_log/varcomp_ww/200908.varcomp_ww.log &
 
 import os
 
@@ -10,7 +10,7 @@ configfile: "source_functions/config/varcomp_ww.yaml"
 
 rule all:
     input:
-        expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/last_solutions", iter = config['iter'], dataset = config['dataset'])
+        expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/{file}", iter = config['iter'], dataset = config['dataset'], file = ["postout", "postmean"])
 
 # Format map file for BLUPF90
 rule format_map:
@@ -26,7 +26,7 @@ rule format_map:
 # Create sample datasets
 rule sample:
     resources:
-        load = 25
+        load = 20
     input:
         fun_three_gen = "source_functions/three_gen.R",
         fun_sample_until = "source_functions/sample_until.R",
@@ -76,7 +76,7 @@ rule pull_genotypes:
 
 rule renf90:
     resources:
-        load = 25
+        load = 1
     input:
         in_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/varcomp_ww.par",
         reduced_geno = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/genotypes.txt",
@@ -97,16 +97,16 @@ rule renf90:
 
 rule gibbs:
     resources:
-        load = 20
+        load = 10
     input:
         renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par",
         renum_out = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.iter{iter}.{dataset}.out"
     params:
         gibbs_path = config['gibbs_path'],
         directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
+        rounds = config['rounds'],
         burnin = config['burnin'],
         thin = config['thin'],
-        rounds = config['rounds'],
         gibbs_out = "gibbs.iter{iter}.{dataset}.out",
         psrecord = "/home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter{iter}.{dataset}.log"
     output:
@@ -114,7 +114,26 @@ rule gibbs:
     shell:
         """
         cd {params.directory}
-        ulimit -S -s unlimited
-        ulimit -H -s unlimited
         psrecord "{params.gibbs_path} renf90.par --rounds {params.rounds} --burnin {params.burnin} --thin {params.thin} --thinprint {params.thin} &> {params.gibbs_out}" --log {params.psrecord} --include-children --interval 5
         """
+
+rule post_gibbs:
+    resources:
+        load = 10
+    input:
+        last_solutions = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/last_solutions"
+    params:
+        directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
+    output:
+        postout = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/postout",
+        postmean = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/postmean"
+    # All integer arguments need to be strings in yaml config file in order to run
+    run:
+        import pexpect
+        child = pexpect.spawn(config['post_gibbs_path'] + ' renf90.par', cwd = params.directory)
+        child.expect('Burn-in?')
+        child.sendline(config['post_gibbs_burnin'])
+        child.expect('Give n to read')
+        child.sendline(config['thin'])
+        child.expect('Choose a graph for samples')
+        child.sendline('0')
