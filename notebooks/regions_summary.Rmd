@@ -230,7 +230,7 @@ animal_regions %>%
     effect_var = "weight",
     trait_var = "ww",
     y_title = "Adjusted weaning weight",
-    plot_title = "Weaning weights across regions\n(1990-present)"
+    plot_title = NULL
   )
 
 ggsave(
@@ -305,8 +305,8 @@ cg_regions %>%
   solutions_boxswarm(
   effect_var = "cg_sol",
   trait_var = "ww",
-  y_title = "CG value",
-  plot_title = "Weaning weight contemporary group solutions\n(1990-present)"
+  y_title = "Weaning weight contemporary group BLUE",
+  plot_title = NULL
 )
 
 ggsave(here::here("figures/regions_summary/ww_cg.solutions_boxswarm_postfilter.png"), width = 8.76, height = 5.4)
@@ -412,16 +412,16 @@ pwg_sum %>%
 ```{r pwg_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE}
 
 animal_regions %>% 
-  filter(trait == "ww") %>%
-  filter(var == "mat_sol") %>% 
+  filter(trait == "pwg") %>%
+  filter(var == "weight") %>% 
   group_by(cg_new, region, trait, var) %>% 
   summarise(value = mean(value)) %>% 
   ungroup() %>% 
   solutions_boxswarm(
     effect_var = "weight",
     trait_var = "pwg",
-    y_title = "Adjusted weight gain",
-    plot_title = "Post-weaning gain across regions\n(1990-present)"
+    y_title = "Adjusted post-weaning gain",
+    plot_title = NULL
   )
 
 ggsave(
@@ -497,8 +497,8 @@ cg_regions %>%
   solutions_boxswarm(
     effect_var = "cg_sol",
     trait_var = "pwg",
-    y_title = "CG value",
-    plot_title = "Post-weaning gain CG solutions across regions\n(1990-present)"
+    y_title = " value",
+    plot_title = NULL
   )
 
 ggsave(here::here("figures/regions_summary/pwg_cg.solutions_boxswarm_postfilter.png"), width = 8.76, height = 5.4)

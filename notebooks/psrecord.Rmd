@@ -21,12 +21,12 @@ library(lubridate)
 source(here::here("source_functions/psrecord_summary.R"))
 ```
 
-# `gibbs2f90`
+# `gibbs`
 
 ```{r}
-usage_summary(process = "varcomp_ww", keyword = "gibbs2f90")
+usage_summary(process = "varcomp_ww", keyword = "gibbs")
 ```
 
 ```{r}
-usage_facets(process = "varcomp_ww", keyword = "gibbs2f90")
+usage_facets(process = "varcomp_ww", keyword = "gibbs")
 ```

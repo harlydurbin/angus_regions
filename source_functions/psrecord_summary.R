@@ -21,6 +21,8 @@ usage_summary <-
     
   }
 
+usage
+
 usage_facets <-
   function(process, keyword, search_pattern = NULL) {
     logs <-

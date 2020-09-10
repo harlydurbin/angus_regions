@@ -2,20 +2,25 @@
 DATAFILE
 data.txt
 TRAITS
-3 4
+3 4 5 6 7 8 9
 FIELDS_PASSED TO OUTPUT
 
 WEIGHT(S)
 
 RESIDUAL_VARIANCE
-1500 0
-0 1500
+1500 0 0 0 0 0 0
+0 1500 0 0 0 0 0
+0 0 1500 0 0 0 0
+0 0 0 1500 0 0 0
+0 0 0 0 1500 0 0
+0 0 0 0 0 1500 0
+0 0 0 0 0 0 1500
 # contemporary group
 EFFECT
-2 2 cross alpha
+2 2 2 2 2 2 2 cross alpha
 # animal effect
 EFFECT
-1 1 cross alpha
+1 1 1 1 1 1 1 cross alpha
 RANDOM
 animal
 OPTIONAL
@@ -23,21 +28,94 @@ mat mpe
 FILE
 ped.txt
 FILE_POS
-1 2 3 0 4
+1 2 3 0 0
+# Needs to be placed after file_pos
+SNP_FILE
+genotypes.txt
 PED_DEPTH
 3
 INBREEDING
 pedigree
 (CO)VARIANCES
-850 0.01 -250 0.01
-0.01 800 0.01 -200
--250 0.01 350 0.01
-0.01 -200 0.01 300
+800 0.01 0.01 0.01 0.01 0.01 0.01 -200 0.01 0.01 0.01 0.01 0.01 0.01
+0.01 800 0.01 0.01 0.01 0.01 0.01 0.01 -200 0.01 0.01 0.01 0.01 0.01
+0.01 0.01 800 0.01 0.01 0.01 0.01 0.01 0.01 -200 0.01 0.01 0.01 0.01
+0.01 0.01 0.01 800 0.01 0.01 0.01 0.01 0.01 0.01 -200 0.01 0.01 0.01
+0.01 0.01 0.01 0.01 800 0.01 0.01 0.01 0.01 0.01 0.01 -200 0.01 0.01
+0.01 0.01 0.01 0.01 0.01 800 0.01 0.01 0.01 0.01 0.01 0.01 -200 0.01
+0.01 0.01 0.01 0.01 0.01 0.01 800 0.01 0.01 0.01 0.01 0.01 0.01 -200
+-200 0.01 0.01 0.01 0.01 0.01 0.01 300 0.01 0.01 0.01 0.01 0.01 0.01
+0.01 -200 0.01 0.01 0.01 0.01 0.01 0.01 300 0.01 0.01 0.01 0.01 0.01
+0.01 0.01 -200 0.01 0.01 0.01 0.01 0.01 0.01 300 0.01 0.01 0.01 0.01
+0.01 0.01 0.01 -200 0.01 0.01 0.01 0.01 0.01 0.01 300 0.01 0.01 0.01
+0.01 0.01 0.01 0.01 -200 0.01 0.01 0.01 0.01 0.01 0.01 300 0.01 0.01
+0.01 0.01 0.01 0.01 0.01 -200 0.01 0.01 0.01 0.01 0.01 0.01 300 0.01
+0.01 0.01 0.01 0.01 0.01 0.01 -200 0.01 0.01 0.01 0.01 0.01 0.01 300
 (CO)VARIANCES_MPE
-
+200 0.01 0.01 0.01 0.01 0.01 0.01
+0.01 200 0.01 0.01 0.01 0.01 0.01
+0.01 0.01 200 0.01 0.01 0.01 0.01
+0.01 0.01 0.01 200 0.01 0.01 0.01
+0.01 0.01 0.01 0.01 200 0.01 0.01
+0.01 0.01 0.01 0.01 0.01 200 0.01
+0.01 0.01 0.01 0.01 0.01 0.01 200
+OPTION chrinfo ../../../chrinfo.50k.txt
 OPTION residual
 OPTION sol se
-OPTION conv_crit 1e-12
+OPTION minfreq 0.01
 OPTION use_yams
 OPTION fact_one file
-OPTION EM-REML 10
+OPTION sex_chr 30
+OPTION excludeCHR
+# Maternal vs. direct within region
+OPTION se_covar_function d1m1 G_2_3_1_1/(G_2_2_1_1*G_3_3_1_1)**0.5
+OPTION se_covar_function d2m2 G_2_3_2_2/(G_2_2_2_2*G_3_3_2_2)**0.5
+OPTION se_covar_function d3m3 G_2_3_3_3/(G_2_2_3_3*G_3_3_3_3)**0.5
+OPTION se_covar_function d4m4 G_2_3_4_4/(G_2_2_4_4*G_3_3_4_4)**0.5
+OPTION se_covar_function d5m5 G_2_3_5_5/(G_2_2_5_5*G_3_3_5_5)**0.5
+OPTION se_covar_function d6m6 G_2_3_6_6/(G_2_2_6_6*G_3_3_6_6)**0.5
+OPTION se_covar_function d7m7 G_2_3_7_7/(G_2_2_7_7*G_3_3_7_7)**0.5
+# Direct vs. direct across region
+OPTION se_covar_function d1d2 G_2_2_1_2/(G_2_2_1_1*G_2_2_2_2)**0.5
+OPTION se_covar_function d1d3 G_2_2_1_3/(G_2_2_1_1*G_2_2_3_3)**0.5
+OPTION se_covar_function d1d4 G_2_2_1_4/(G_2_2_1_1*G_2_2_4_4)**0.5
+OPTION se_covar_function d1d5 G_2_2_1_5/(G_2_2_1_1*G_2_2_5_5)**0.5
+OPTION se_covar_function d1d6 G_2_2_1_6/(G_2_2_1_1*G_2_2_6_6)**0.5
+OPTION se_covar_function d1d7 G_2_2_1_7/(G_2_2_1_1*G_2_2_7_7)**0.5
+OPTION se_covar_function d2d3 G_2_2_2_3/(G_2_2_2_2*G_2_2_3_3)**0.5
+OPTION se_covar_function d2d4 G_2_2_2_4/(G_2_2_2_2*G_2_2_4_4)**0.5
+OPTION se_covar_function d2d5 G_2_2_2_5/(G_2_2_2_2*G_2_2_5_5)**0.5
+OPTION se_covar_function d2d6 G_2_2_2_6/(G_2_2_2_2*G_2_2_6_6)**0.5
+OPTION se_covar_function d2d7 G_2_2_2_7/(G_2_2_2_2*G_2_2_7_7)**0.5
+OPTION se_covar_function d3d4 G_2_2_3_4/(G_2_2_3_3*G_2_2_4_4)**0.5
+OPTION se_covar_function d3d5 G_2_2_3_5/(G_2_2_3_3*G_2_2_5_5)**0.5
+OPTION se_covar_function d3d6 G_2_2_3_6/(G_2_2_3_3*G_2_2_6_6)**0.5
+OPTION se_covar_function d3d7 G_2_2_3_7/(G_2_2_3_3*G_2_2_7_7)**0.5
+OPTION se_covar_function d4d5 G_2_2_4_5/(G_2_2_4_4*G_2_2_5_5)**0.5
+OPTION se_covar_function d4d6 G_2_2_4_6/(G_2_2_4_4*G_2_2_6_6)**0.5
+OPTION se_covar_function d4d7 G_2_2_4_7/(G_2_2_4_4*G_2_2_7_7)**0.5
+OPTION se_covar_function d5d6 G_2_2_5_6/(G_2_2_5_5*G_2_2_6_6)**0.5
+OPTION se_covar_function d5d7 G_2_2_5_7/(G_2_2_5_5*G_2_2_7_7)**0.5
+OPTION se_covar_function d6d7 G_2_2_6_7/(G_2_2_6_6*G_2_2_7_7)**0.5
+# Maternal vs. maternal across region
+OPTION se_covar_function m1m2 G_3_3_1_2/(G_3_3_1_1*G_3_3_2_2)**0.5
+OPTION se_covar_function m1m3 G_3_3_1_3/(G_3_3_1_1*G_3_3_3_3)**0.5
+OPTION se_covar_function m1m4 G_3_3_1_4/(G_3_3_1_1*G_3_3_4_4)**0.5
+OPTION se_covar_function m1m5 G_3_3_1_5/(G_3_3_1_1*G_3_3_5_5)**0.5
+OPTION se_covar_function m1m6 G_3_3_1_6/(G_3_3_1_1*G_3_3_6_6)**0.5
+OPTION se_covar_function m1m7 G_3_3_1_7/(G_3_3_1_1*G_3_3_7_7)**0.5
+OPTION se_covar_function m2m3 G_3_3_2_3/(G_3_3_2_2*G_3_3_3_3)**0.5
+OPTION se_covar_function m2m4 G_3_3_2_4/(G_3_3_2_2*G_3_3_4_4)**0.5
+OPTION se_covar_function m2m5 G_3_3_2_5/(G_3_3_2_2*G_3_3_5_5)**0.5
+OPTION se_covar_function m2m6 G_3_3_2_6/(G_3_3_2_2*G_3_3_6_6)**0.5
+OPTION se_covar_function m2m7 G_3_3_2_7/(G_3_3_2_2*G_3_3_7_7)**0.5
+OPTION se_covar_function m3m4 G_3_3_3_4/(G_3_3_3_3*G_3_3_4_4)**0.5
+OPTION se_covar_function m3m5 G_3_3_3_5/(G_3_3_3_3*G_3_3_5_5)**0.5
+OPTION se_covar_function m3m6 G_3_3_3_6/(G_3_3_3_3*G_3_3_6_6)**0.5
+OPTION se_covar_function m3m7 G_3_3_3_7/(G_3_3_3_3*G_3_3_7_7)**0.5
+OPTION se_covar_function m4m5 G_3_3_4_5/(G_3_3_4_4*G_3_3_5_5)**0.5
+OPTION se_covar_function m4m6 G_3_3_4_6/(G_3_3_4_4*G_3_3_6_6)**0.5
+OPTION se_covar_function m4m7 G_3_3_4_7/(G_3_3_4_4*G_3_3_7_7)**0.5
+OPTION se_covar_function m5m6 G_3_3_5_6/(G_3_3_5_5*G_3_3_6_6)**0.5
+OPTION se_covar_function m5m7 G_3_3_5_7/(G_3_3_5_5*G_3_3_7_7)**0.5
+OPTION se_covar_function m6m7 G_3_3_6_7/(G_3_3_6_6*G_3_3_7_7)**0.5

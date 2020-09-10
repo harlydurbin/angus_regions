@@ -1,0 +1,44 @@
+---
+title: "Gibbs"
+author: "Harly Durbin"
+date: "9/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+```{r, fig.width=10, fig.height=10}
+gibbs_samples <-
+  c("3v1", "3v2", "3v5", "3v7", "3v8", "3v9") %>%
+  purrr::set_names() %>% 
+  purrr::map_dfr(~ read_table2(here::here(glue::glue("data/derived_data/varcomp_ww/iter1/{.x}/postgibbs_samples")), col_names = FALSE), .id = "region") %>% 
+  janitor::remove_empty(which = c("rows", "cols")) %>% 
+  select(-X3, -X2) %>% 
+  select(region:X18) %>% 
+  tidyr::pivot_longer(cols = X4:X18) %>%
+rename(sample = X1, variable = name)
+```
+
+
+```{r, fig.width=10, fig.height=10}
+gibbs_samples %>% 
+  ggplot(aes(x = sample, y = value, color = variable)) +
+  geom_line() +
+  facet_wrap(~ region)
+
+```
+
+```{r, fig.width=5, fig.height=5}
+gibbs_samples %>% 
+  filter(variable == "X9") %>% 
+  filter(region == "3v1") %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram()
+
+```
