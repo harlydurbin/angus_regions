@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=120 -j 12 --config --until gibbs &> log/snakemake_log/varcomp_ww/200910.varcomp_ww.log &
+# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=60 -j 12 --config --until gibbs &> log/snakemake_log/varcomp_ww/200917.varcomp_ww.log &
 
 import os
 
@@ -117,28 +117,6 @@ rule gibbs:
         cd {params.directory}
         psrecord "echo -e 'renf90.par \\n {params.rounds} {params.burnin} \\n {params.thin}' | {params.gibbs_path} &> {params.gibbs_out}" --log {params.psrecord} --include-children --interval 5
         """
-# rule gibbs_tworegion:
-#     resources:
-#         load = 20
-#     input:
-#         renum_par = lambda wildcards: expand("data/derived_data/varcomp_ww/iter{iter}/{region}/renf90.par", iter = wildcards.iter, region = wildcards.region),
-#         renum_out = lambda wildcards: expand("data/derived_data/varcomp_ww/iter{iter}/{region}/renf90.iter{iter}.{region}.out", iter = wildcards.iter, region = wildcards.region)
-#     params:
-#         gibbs_path = config['gibbs_path'],
-#         directory = "data/derived_data/varcomp_ww/iter{iter}/{region}",
-#         rounds = config['rounds'],
-#         burnin = config['burnin'],
-#         thin = config['thin'],
-#         gibbs_out = "gibbs.iter{iter}.{region}.out",
-#         psrecord = "/home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter{iter}.{region}.log"
-#     output:
-#         last_solutions = "data/derived_data/varcomp_ww/iter{iter}/{region}/last_solutions"
-#     # nohup psrecord "echo -e 'renf90.par \n 200000 10000 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.all.out" --log /home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter1.all.log --include-children --interval 5 &
-#     shell:
-#         """
-#         cd {params.directory}
-#         psrecord "echo -e 'renf90.par \\n {params.rounds} {params.burnin} \\n {params.thin}' | {params.gibbs_path} &> {params.gibbs}" --log {params.psrecord} --include-children --interval 5
-#         """
 
 rule post_gibbs:
     resources:
