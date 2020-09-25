@@ -23,6 +23,8 @@ source(here::here("source_functions/psrecord_summary.R"))
 
 # `gibbs`
 
+nohup psrecord "echo -e 'renf90.par \n 30000 0 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter2.3v9.out" --log /home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter2.3v9.log --include-children --interval 5 &
+
 ```{r}
 usage_summary(process = "varcomp_ww", keyword = "gibbs")
 ```

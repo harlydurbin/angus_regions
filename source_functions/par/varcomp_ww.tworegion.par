@@ -37,8 +37,8 @@ pedigree
 -100 0.01 300 0.01
 0.01 -200 0.01 300
 (CO)VARIANCES_MPE
-200 0.01
-0.01 200
+200 0
+0 200
 OPTION chrinfo ../../../chrinfo.50k.txt
 OPTION residual
 OPTION cat 0 0

@@ -13,11 +13,90 @@ library(tidyr)
 library(ggplot2)
 ```
 
+nohup psrecord "/usr/local/bin/airemlf90 renf90.par &> aireml.iter7.3v8.out" --log /home/agiintern/regions/log/psrecord/varcomp_ww/aireml/aireml.iter7.3v8.log --include-children --interval 5 &
+
+# Unfinished 200,000 rounds
+
+* 10,000 round burn-in
+* Sample every 20 rounds
+
+## Import "Monte Carlo error by time series"
+
+* Assuming effect 0 corresponds to residual?
+* Effective sample size: "At least > 10 is recommended. > 30 may be better."
+
+```{r}
+read_table2(here::here("data/derived_data/varcomp_ww/iter9/3v8/postout"), skip = 4, n_max = 15, col_names = c("position", "eff1", "eff2", "trt1", "trt2", "mce", "mean", "hdp", "effective_sample_size", "median", "mode"))
+```
+
+
+## Import "posterior standard deviation"
+
+```{r}
+read_table2(here::here("data/derived_data/varcomp_ww/iter9/3v8/postout"), skip = 27, n_max = 15, col_names = c("position", "eff1", "eff2", "trt1", "trt2", "psd", "mean", "psd_interval_lo", "psd_interval_hi", "convergence", "auto_lag1", "auto_lag10", "auto_lag50", "independent_batches")) 
+```
+
+## Import samples
+
+"The meaning of each column is:
+
+Column 1: the sequential number for saved samples.
+Column 2: the actual round in which each sample was drawn.
+Column 3: the number of parameters.
+Column 4 or later: actual samples ordered by the position index.
+
+```{r, message=FALSE, warning=FALSE}
+gibbs200 <-
+  c("iter4/3v9", "iter5/3v2", "iter8/3v2", "iter9/3v8", "iter9/3v9", "iter10/3v1") %>%
+  purrr::set_names() %>%
+  purrr::map_dfr(~ read_table2(here::here(glue::glue("data/derived_data/varcomp_ww/{.x}/postgibbs_samples")), col_names = FALSE), .id = "region") %>% 
+  janitor::remove_empty(which = c("rows", "cols")) %>% 
+  rename(sample = X1, round = X2)
+  select(-X3, -X2) %>% 
+  select(region:X18) %>% 
+  tidyr::pivot_longer(cols = X4:X18) %>%
+rename(sample = X1, variable = name)
+```
+
+## Plot samples
+
+* Residual for position 15
+
 ```{r, fig.width=10, fig.height=10}
-gibbs_samples <-
+gibbs200 %>% 
+  ggplot(aes(x = sample, y = value, color = variable)) +
+  geom_line() +
+  facet_wrap(~ region)
+
+```
+
+# Test with 30,000 rounds
+
+* No burn in yet
+* Sample every 20 rounds
+---
+
+## Import "Monte Carlo error by time series"
+
+Assuming effect 0 corresponds to residual?
+
+```{r}
+read_table2(here::here("data/derived_data/varcomp_ww/iter2/3v1/postout"), skip = 4, n_max = 15, col_names = c("position", "eff1", "eff2", "trt1", "trt2", "mce", "mean", "hdp", "effective_sample_size", "median", "mode"))
+```
+
+## Import "posterior standard deviation"
+
+```{r}
+read_table2(here::here("data/derived_data/varcomp_ww/iter2/3v1/postout"), skip = 27, n_max = 15, col_names = c("position", "eff1", "eff2", "trt1", "trt2", "psd", "mean", "psd_interval_lo", "psd_interval_hi", "convergence", "auto_lag1", "auto_lag10", "auto_lag50", "independent_batches")) 
+```
+
+## Import samples
+
+```{r, message=FALSE, warning=FALSE}
+gibbs30 <-
   c("3v1", "3v2", "3v5", "3v7", "3v8", "3v9") %>%
   purrr::set_names() %>% 
-  purrr::map_dfr(~ read_table2(here::here(glue::glue("data/derived_data/varcomp_ww/iter1/{.x}/postgibbs_samples")), col_names = FALSE), .id = "region") %>% 
+  purrr::map_dfr(~ read_table2(here::here(glue::glue("data/derived_data/varcomp_ww/iter2/{.x}/postgibbs_samples")), col_names = FALSE), .id = "region") %>% 
   janitor::remove_empty(which = c("rows", "cols")) %>% 
   select(-X3, -X2) %>% 
   select(region:X18) %>% 
@@ -25,9 +104,10 @@ gibbs_samples <-
 rename(sample = X1, variable = name)
 ```
 
+## Plot samples
 
 ```{r, fig.width=10, fig.height=10}
-gibbs_samples %>% 
+gibbs30 %>% 
   ggplot(aes(x = sample, y = value, color = variable)) +
   geom_line() +
   facet_wrap(~ region)
