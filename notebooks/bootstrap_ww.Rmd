@@ -86,7 +86,7 @@ bootstrap_h2s <-
   tibble(iter = c(1:10)) %>% 
   expand(iter, region = c(1, 2, 5, 7, 8, 9)) %>% 
   mutate(data = 
-           purrr::map2(.x = iter, .y = region, ~ read_bootstrap_covs(iteration = .x, r1 = 3, r2 = .y))) %>% 
+           purrr::map2(.x = iter, .y = region, ~ read_bootstrap_h2(iteration = .x, r1 = 3, r2 = .y))) %>% 
   unnest()
 
 ```

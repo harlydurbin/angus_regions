@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=60 -j 12 --config --until gibbs &> log/snakemake_log/varcomp_ww/200917.varcomp_ww.log &
+# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=120 -j 12 --config &> log/snakemake_log/varcomp_ww/200925.varcomp_ww.log &
 
 import os
 
@@ -10,7 +10,7 @@ configfile: "source_functions/config/varcomp_ww.yaml"
 
 rule all:
     input:
-     expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/{file}", iter = config['iter'], dataset = config['dataset'], file = ["postout", "postmean"])
+     expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log", iter = config['iter'], dataset = config['dataset'])
 
 # Format map file for BLUPF90
 rule format_map:
@@ -26,7 +26,7 @@ rule format_map:
 # Create sample datasets
 rule sample:
     resources:
-        load = 20
+        load = 40
     input:
         fun_three_gen = "source_functions/three_gen.R",
         fun_sample_until = "source_functions/sample_until.R",
@@ -49,9 +49,9 @@ rule sample:
 # Copy par file for tworegion datasets
 rule copy_par:
     resources:
-        load = 3
+        load = 20
     input:
-        in_par = lambda wildcards: expand("source_functions/par/varcomp_ww.{analysis}.par", analysis = config['dataset_key'][wildcards.dataset])
+        in_par = "source_functions/par/varcomp_ww.{dataset}.par"
     output:
         out_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/varcomp_ww.par"
     shell:
@@ -60,10 +60,8 @@ rule copy_par:
 # Left join genotypes in master genotype file to list of genotyped animals to be used
 rule pull_genotypes:
     resources:
-        load = 20
+        load = 30
     input:
-        datafile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/data.txt",
-        pedfile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/ped.txt",
         pullfile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/pull_list.txt"
     params:
         master_geno = config['master_geno']
@@ -95,46 +93,25 @@ rule renf90:
         {params.renumf90_path} varcomp_ww.par &> {params.renum_out}
         """
 
-rule gibbs:
+rule aireml:
     resources:
         load = lambda wildcards: config['resources_key'][wildcards.dataset]
     input:
         renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par",
         renum_out = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.iter{iter}.{dataset}.out"
     params:
-        gibbs_path = config['gibbs_path'],
+        aireml_path = config['airemlf90_path'],
         directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
-        rounds = config['rounds'],
-        burnin = config['burnin'],
-        thin = config['thin'],
-        gibbs_out = "gibbs.iter{iter}.{dataset}.out",
-        psrecord = "/home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter{iter}.{dataset}.log"
+        aireml_out = "aireml.iter{iter}.{dataset}.out",
+        psrecord = "/home/agiintern/regions/log/psrecord/varcomp_ww/aireml/aireml.iter{iter}.{dataset}.log",
+        aireml_renamed = "airemlf90.iter{iter}.{dataset}.log"
     output:
-        last_solutions = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/last_solutions"
-    # nohup psrecord "echo -e 'renf90.par \n 200000 10000 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.all.out" --log /home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter1.all.log --include-children --interval 5 &
+        aireml_renamed = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log"
     shell:
         """
         cd {params.directory}
-        psrecord "echo -e 'renf90.par \\n {params.rounds} {params.burnin} \\n {params.thin}' | {params.gibbs_path} &> {params.gibbs_out}" --log {params.psrecord} --include-children --interval 5
+        ulimit -S -s unlimited
+        ulimit -H -s unlimited
+        psrecord "{params.aireml_path} renf90.par &> {params.aireml_out}" --log {params.psrecord} --include-children --interval 5
+        mv airemlf90.log {params.aireml_renamed}
         """
-
-rule post_gibbs:
-    resources:
-        load = 10
-    input:
-        last_solutions = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/last_solutions"
-    params:
-        directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
-    output:
-        postout = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/postout",
-        postmean = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/postmean"
-    # All integer arguments need to be strings in yaml config file in order to run
-    run:
-        import pexpect
-        child = pexpect.spawn(config['post_gibbs_path'] + ' renf90.par', cwd = params.directory)
-        child.expect('Burn-in?')
-        child.sendline(config['post_gibbs_burnin'])
-        child.expect('Give n to read')
-        child.sendline(config['thin'])
-        child.expect('Choose a graph for samples')
-        child.sendline('0')

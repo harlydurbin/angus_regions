@@ -1,0 +1,137 @@
+---
+title: "Starting covariances"
+author: "Harly Durbin"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(readr)
+library(tidyr)
+library(magrittr)
+library(stringr)
+
+source(here::here("source_functions/melt_aireml.R"))
+source(here::here("source_functions/region_key.R"))
+source(here::here("source_functions/read_bootstrap_corrs.R"))
+```
+
+# Setup
+
+```{r}
+ped_covs <-
+  tibble(iter = c(1:10)) %>% 
+  expand(iter,
+         region = c(1, 2, 5, 7, 8, 9)) %>% 
+  mutate(data = 
+           purrr::map2(.x = iter,
+                       .y = region,
+                       ~ read_bootstrap_covs(iteration = .x,
+                                           r1 = 3,
+                                           r2 = .y))) %>% 
+  unnest()
+```
+
+```{r}
+
+print_ped_covs <- function(var_region){
+  ped_covs %>% 
+    filter(region == var_region) %>% 
+    group_by(val1, val2) %>% 
+    summarise(min = min(var_cov)) %>%
+    ungroup() %>% 
+    filter_if(is.character, 
+              any_vars(!str_detect(., "mpe|res"))) %>% 
+    tidyr::pivot_wider(names_from = val2,
+                       values_from = min) %>% 
+    select(val1, HP_dir, contains("dir"), HP_mat, contains("mat")) %>% 
+    mutate(val1 = case_when(val1 == "HP_dir" ~ 1,
+                            str_detect(val1, "dir") ~ 2,
+                            val1 == "HP_mat" ~ 3,
+                            str_detect(val1, "mat") ~ 4)) %>% 
+    arrange(val1) %>% 
+    select(-val1) %>% 
+    as.matrix()
+}
+
+```
+
+```{r}
+print_ped_mperes <- function(var_region){
+  ped_covs %>% 
+    filter(region == var_region) %>% 
+    group_by(val1, val2) %>% 
+    summarise(min = min(var_cov)) %>% 
+    filter_if(is.character, 
+              all_vars(str_detect(., "mpe|res"))) %>% 
+    filter(val1 == val2)
+  }
+```
+
+
+# Choose starting covariances
+
+## 3v1
+
+```{r}
+print_ped_covs(var_region = 1)
+```
+
+```{r}
+print_ped_mperes(var_region = 1)
+```
+
+## 3v2
+
+```{r}
+print_ped_covs(var_region = 2)
+```
+
+```{r}
+print_ped_mperes(var_region = 2)
+```
+
+## 3v5
+
+```{r}
+print_ped_covs(var_region = 5)
+```
+
+```{r}
+print_ped_mperes(var_region = 5)
+```
+
+## 3v7
+
+```{r}
+print_ped_covs(var_region = 7)
+```
+
+```{r}
+print_ped_mperes(var_region = 7)
+```
+
+## 3v8
+
+```{r}
+print_ped_covs(var_region = 8)
+```
+
+```{r}
+print_ped_mperes(var_region = 8)
+```
+
+## 3v9
+
+```{r}
+print_ped_covs(var_region = 9)
+```
+
+```{r}
+print_ped_mperes(var_region = 9)
+```
+
+# Commentary
+
+Goal is to choose starting covariances based on pedigree-based results

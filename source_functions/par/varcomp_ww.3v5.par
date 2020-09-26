@@ -1,20 +1,21 @@
-#header: Animal cg region_3 region_other
+#header: Animal cg region_3 region_1
 DATAFILE
 data.txt
 TRAITS
-3
+3 4
 FIELDS_PASSED TO OUTPUT
 
 WEIGHT(S)
 
 RESIDUAL_VARIANCE
-1760.34
+1520.60 0
+0 1593.40
 # contemporary group
 EFFECT
-2 cross alpha
+2 2 cross alpha
 # animal effect
 EFFECT
-1 cross alpha
+1 1 cross alpha
 RANDOM
 animal
 OPTIONAL
@@ -30,11 +31,15 @@ PED_DEPTH
 3
 INBREEDING
 pedigree
+# 3_d other_d 3_m other_m
 (CO)VARIANCES
-986.44125 -200
--200 402.708
+813.00 765.19 -262.09 -210.12
+765.19 1019.70 -266.02 -291.80
+-262.09 -266.02 320.96 288.11
+-210.12 -291.80 288.11 360.32
 (CO)VARIANCES_MPE
-326.15875
+269.53 0
+0 398.42
 OPTION chrinfo ../../../chrinfo.50k.txt
 OPTION residual
 OPTION EM-REML 15
@@ -44,4 +49,9 @@ OPTION use_yams
 OPTION fact_one file
 OPTION sex_chr 30
 OPTION excludeCHR
+# G_eff1_eff2_trt1_trt2
+OPTION se_covar_function d1d2 G_2_2_1_2/(G_2_2_1_1*G_2_2_2_2)**0.5
+OPTION se_covar_function m1m2 G_3_3_1_2/(G_3_3_1_1*G_3_3_2_2)**0.5
 OPTION se_covar_function d1m1 G_2_3_1_1/(G_2_2_1_1*G_3_3_1_1)**0.5
+OPTION se_covar_function d2m2 G_2_3_2_2/(G_2_2_2_2*G_3_3_2_2)**0.5
+OPTION seed 817 712

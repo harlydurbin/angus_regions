@@ -4,10 +4,10 @@ aireml_long <-
     
     
     df %>%
-      mutate(val1 = colnames(.)) %>%
+      dplyr::mutate(val1 = colnames(.)) %>%
       reshape2::melt(value.name = "var_cov", id = c("val1")) %>%
-      mutate(val2 = as.character(variable)) %>%
-      select(-variable)
+      dplyr::mutate(val2 = as.character(variable)) %>%
+      dplyr::select(-variable)
     
   }
 
@@ -28,36 +28,42 @@ melt_aireml <-
       # Split string into strings by newline
       stringr::str_split("\n") %>% 
       # Remove extraneous space from strings
-      purrr::map(~ str_squish(.x)) %>% 
+      purrr::map(~ stringr::str_squish(.x)) %>% 
       # Convert list of strings to nested data frame
       tibble::tibble() %>% 
       # Rename column
-      rename(c1 = 1) %>% 
+      dplyr::rename(c1 = 1) %>% 
       # Results in one line per row in df
-      unnest(c1)
+      tidyr::unnest(c1)
     
     # Row numbers of where to find variance/covariance matrices
-    rownum1 <- which(str_detect(raw$c1, "Genetic variance\\(s\\) for effect 1"))
+    rownum1 <- which(stringr::str_detect(raw$c1,
+                                         "Genetic variance\\(s\\) for effect 1"))
     
-    rownum2 <- which(str_detect(raw$c1, "Genetic variance\\(s\\) for effect 2"))
+    rownum2 <- which(stringr::str_detect(raw$c1,
+                                         "Genetic variance\\(s\\) for effect 2"))
     
-    rownum3 <- which(str_detect(raw$c1, "Genetic variance\\(s\\) for effect 3"))
+    rownum3 <- which(stringr::str_detect(raw$c1,
+                                         "Genetic variance\\(s\\) for effect 3"))
     
-    rownum4 <- which(str_detect(raw$c1, "Genetic variance\\(s\\) for effect 4"))
+    rownum4 <- which(stringr::str_detect(raw$c1,
+                                         "Genetic variance\\(s\\) for effect 4"))
     
-    rownum5 <- which(str_detect(raw$c1, "Genetic variance\\(s\\) for effect 5"))
+    rownum5 <- which(stringr::str_detect(raw$c1,
+                                         "Genetic variance\\(s\\) for effect 5"))
     
-    rownum_res <- which(str_detect(raw$c1, "Residual variance\\(s\\)"))
+    rownum_res <- which(stringr::str_detect(raw$c1,
+                                            "Residual variance\\(s\\)"))
     
     
     mat1 <-
       if(!is.null(effect1)) {
         
         raw %>% 
-          slice(
+          dplyr::slice(
             (rownum1 + 1):(rownum1 + as.integer(length(effect1)))
           ) %>% 
-          separate(c1, sep = " ", into = effect1) %>% 
+          tidyr::separate(c1, sep = " ", into = effect1) %>% 
           aireml_long()
         
       
@@ -68,10 +74,10 @@ melt_aireml <-
     mat2 <- 
       if(!is.null(effect2)){
         raw %>% 
-          slice(
+          dplyr::slice(
             (rownum2 + 1):(rownum2 + as.integer(length(effect2)))
           ) %>% 
-          separate(c1, sep = " ", into = effect2) %>% 
+          tidyr::separate(c1, sep = " ", into = effect2) %>% 
           aireml_long()
       }
 
@@ -79,10 +85,10 @@ melt_aireml <-
     mat3 <-
       if(!is.null(effect3)){
         raw %>%
-          slice(
+          dplyr::slice(
             (rownum3 + 1):(rownum3 + as.integer(length(effect3)))
           ) %>%
-          separate(c1, sep = " ", into = effect3) %>%
+          tidyr::separate(c1, sep = " ", into = effect3) %>%
           aireml_long()
       }
 
@@ -90,35 +96,35 @@ melt_aireml <-
     mat4 <-
       if(!is.null(effect4)){
         raw %>%
-          slice(
+          dplyr::slice(
             (rownum4 + 1):(rownum4 + as.integer(length(effect4)))
           ) %>%
-          separate(c1, sep = " ", into = effect4) %>%
+          tidyr::separate(c1, sep = " ", into = effect4) %>%
           aireml_long()
       }
 
     mat5 <-
       if(!is.null(effect5)){
         raw %>%
-          slice(
+          dplyr::slice(
             (rownum5 + 1):(rownum5 + as.integer(length(effect5)))
           ) %>%
-          separate(c1, sep = " ", into = effect5) %>%
+          tidyr::separate(c1, sep = " ", into = effect5) %>%
           aireml_long()
       }
     
     
     resmat <-
       raw %>% 
-      slice(
+      dplyr::slice(
         (rownum_res + 1):(rownum_res + as.integer(length(resids)))
       ) %>% 
-      separate(c1, sep = " ", into = resids) %>% 
+      tidyr::separate(c1, sep = " ", into = resids) %>% 
       aireml_long()
     
     
     bind_rows(mat1, mat2, mat3, mat4, mat5, resmat) %>% 
-      select(val1, val2, var_cov) %>% 
-      mutate(var_cov = as.numeric(var_cov))
+      dplyr::select(val1, val2, var_cov) %>% 
+      dplyr::mutate(var_cov = as.numeric(var_cov))
     
      }
