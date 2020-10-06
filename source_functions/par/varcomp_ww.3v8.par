@@ -8,8 +8,8 @@ FIELDS_PASSED TO OUTPUT
 WEIGHT(S)
 
 RESIDUAL_VARIANCE
-1588.10 0
-0 1592.30
+1846.30 0
+0 1970.80
 # contemporary group
 EFFECT
 2 2 cross alpha
@@ -24,31 +24,24 @@ FILE
 ped.txt
 FILE_POS
 1 2 3 0 0
-# Needs to be placed after file_pos
-SNP_FILE
-genotypes.txt
 PED_DEPTH
 3
 INBREEDING
 pedigree
 # 3_d other_d 3_m other_m
 (CO)VARIANCES
-769.53 739.64 -251.65 -311.14
-739.64 933.59 -197.52 -311.32
--251.65 -197.52 332.84 259.03
--311.14 -311.32 259.03 370.65
+1216.600 981.670 -75.779 -129.94
+981.670 1132.800 -23.665 -212.59
+-75.779 -23.665 484.510 457.97
+-129.940 -212.590 457.970 479.97
 (CO)VARIANCES_MPE
-251.36 0
-0 403.37
-OPTION chrinfo ../../../chrinfo.50k.txt
+367.13 0
+0 507.89
 OPTION residual
-OPTION EM-REML 15
+OPTION EM-REML 10
 OPTION sol se
-OPTION minfreq 0.01
 OPTION use_yams
 OPTION fact_one file
-OPTION sex_chr 30
-OPTION excludeCHR
 # G_eff1_eff2_trt1_trt2
 OPTION se_covar_function d1d2 G_2_2_1_2/(G_2_2_1_1*G_2_2_2_2)**0.5
 OPTION se_covar_function m1m2 G_3_3_1_2/(G_3_3_1_1*G_3_3_2_2)**0.5

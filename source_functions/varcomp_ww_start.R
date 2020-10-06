@@ -127,18 +127,11 @@ iter_genotyped <-
 
 
 ## -----------------------------------------------------------------------------
-c("all", "3v1", "3v2", "3v5", "3v7", "3v8", "3v9") %>%
-  purrr::map(
-    ~ iter_genotyped %>%
-      select(format_reg) %>%
-      write_delim(here::here(
-        glue(
-          "data/derived_data/varcomp_ww/iter{iter}/{.x}/pull_list.txt"
-        )
-      ),
-      delim = " ",
-      col_names = FALSE)
-  )
+iter_genotyped %>%
+    select(format_reg) %>%
+    write_delim(here::here(glue("data/derived_data/varcomp_ww/iter{iter}/pull_list.txt")),
+                delim = " ",
+                col_names = FALSE)
 
 
 ## -----------------------------------------------------------------------------

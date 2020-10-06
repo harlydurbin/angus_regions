@@ -39,12 +39,12 @@ print_ped_covs <- function(var_region){
   ped_covs %>% 
     filter(region == var_region) %>% 
     group_by(val1, val2) %>% 
-    summarise(min = min(var_cov)) %>%
+    summarise(max = max(var_cov)) %>%
     ungroup() %>% 
     filter_if(is.character, 
               any_vars(!str_detect(., "mpe|res"))) %>% 
     tidyr::pivot_wider(names_from = val2,
-                       values_from = min) %>% 
+                       values_from = max) %>% 
     select(val1, HP_dir, contains("dir"), HP_mat, contains("mat")) %>% 
     mutate(val1 = case_when(val1 == "HP_dir" ~ 1,
                             str_detect(val1, "dir") ~ 2,
@@ -62,7 +62,7 @@ print_ped_mperes <- function(var_region){
   ped_covs %>% 
     filter(region == var_region) %>% 
     group_by(val1, val2) %>% 
-    summarise(min = min(var_cov)) %>% 
+    summarise(max = max(var_cov)) %>% 
     filter_if(is.character, 
               all_vars(str_detect(., "mpe|res"))) %>% 
     filter(val1 == val2)

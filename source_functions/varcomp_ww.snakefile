@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=120 -j 12 --config &> log/snakemake_log/varcomp_ww/200925.varcomp_ww.log &
+# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=160 -j 12 --config &> log/snakemake_log/varcomp_ww/201006.varcomp_ww.log &
 
 import os
 
@@ -10,7 +10,7 @@ configfile: "source_functions/config/varcomp_ww.yaml"
 
 rule all:
     input:
-     expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log", iter = config['iter'], dataset = config['dataset'])
+     expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log", iter = config['iter'], dataset = config['dataset']), expand("data/derived_data/varcomp_ww/iter{iter}/genotypes.iter{iter}.txt", iter = config['iter'])
 
 # Format map file for BLUPF90
 rule format_map:
@@ -41,7 +41,7 @@ rule sample:
     output:
         datafile = expand("data/derived_data/varcomp_ww/iter{{iter}}/{dataset}/data.txt", dataset = config['dataset']),
         pedfile = expand("data/derived_data/varcomp_ww/iter{{iter}}/{dataset}/ped.txt", dataset = config['dataset']),
-        pull_list = expand("data/derived_data/varcomp_ww/iter{{iter}}/{dataset}/pull_list.txt", dataset = config['dataset']),
+        pull_list = "data/derived_data/varcomp_ww/iter{iter}/pull_list.txt",
         summary = "data/derived_data/varcomp_ww/iter{iter}/varcomp_ww.data_summary.iter{iter}.csv"
     shell:
         "Rscript --vanilla {input.script} {params.iter} &> log/rule_log/varcomp_ww/sample/sample.iter{params.iter}.log"
@@ -62,11 +62,11 @@ rule pull_genotypes:
     resources:
         load = 30
     input:
-        pullfile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/pull_list.txt"
+        pullfile = "data/derived_data/varcomp_ww/iter{iter}/pull_list.txt"
     params:
         master_geno = config['master_geno']
     output:
-        reduced_geno = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/genotypes.txt"
+        reduced_geno = "data/derived_data/varcomp_ww/iter{iter}/genotypes.iter{iter}.txt"
     shell:
         """
         grep -Fwf {input.pullfile} {params.master_geno} | awk '{{printf "%-25s %s\\n", $1, $2}}' &> {output.reduced_geno}
@@ -77,7 +77,6 @@ rule renf90:
         load = 20
     input:
         in_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/varcomp_ww.par",
-        reduced_geno = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/genotypes.txt",
         datafile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/data.txt",
         pedfile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/ped.txt"
     params:
