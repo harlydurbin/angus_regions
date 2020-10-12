@@ -2,7 +2,7 @@ logged_rules: ['sample', 'aireml']
 
 renumf90_path: '~/bin/renumf90'
 
-airemlf90_path: '/usr/local/bin/airemlf90'
+airemlf90_path: '~/bin/airemlf90'
 
 master_map: 'data/raw_data/angus_map'
 

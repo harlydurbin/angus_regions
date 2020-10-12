@@ -1,4 +1,5 @@
 #header: Animal cg region_3 region_other
+# test
 DATAFILE
 data.txt
 TRAITS
@@ -8,8 +9,8 @@ FIELDS_PASSED TO OUTPUT
 WEIGHT(S)
 
 RESIDUAL_VARIANCE
-1500 0
-0 1500
+1800 0
+0 1800
 # contemporary group
 EFFECT
 2 2 cross alpha
@@ -24,9 +25,6 @@ FILE
 ped.txt
 FILE_POS
 1 2 3 0 0
-# Needs to be placed after file_pos
-SNP_FILE
-genotypes.txt
 PED_DEPTH
 3
 INBREEDING
@@ -39,18 +37,15 @@ pedigree
 (CO)VARIANCES_MPE
 200 0
 0 200
-OPTION chrinfo ../../../chrinfo.50k.txt
 OPTION residual
-OPTION cat 0 0
 OPTION sol se
-OPTION minfreq 0.01
 OPTION use_yams
 OPTION fact_one file
-OPTION sex_chr 30
-OPTION excludeCHR
 # G_eff1_eff2_trt1_trt2
 OPTION se_covar_function d1d2 G_2_2_1_2/(G_2_2_1_1*G_2_2_2_2)**0.5
 OPTION se_covar_function m1m2 G_3_3_1_2/(G_3_3_1_1*G_3_3_2_2)**0.5
 OPTION se_covar_function d1m1 G_2_3_1_1/(G_2_2_1_1*G_3_3_1_1)**0.5
 OPTION se_covar_function d2m2 G_2_3_2_2/(G_2_2_2_2*G_3_3_2_2)**0.5
 OPTION seed 817 712
+OPTION EM-REML 25
+OPTION tol 1d-06

@@ -7,7 +7,8 @@ solutions_line <-
            trait_var,
            y_lab,
            plot_title,
-           national_avg) {
+           national_avg,
+           stat = "mean") {
     sum1 <-
       df %>%
       filter(trait == trait_var & var == effect_var) %>%
@@ -15,7 +16,8 @@ solutions_line <-
         yr = year,
         region = as.character(region)) %>%
       group_by(region, yr) %>%
-      summarise(mean = mean(value))
+      summarise(mean = mean(value),
+                median = median(value))
     
     sum2 <-
       if (national_avg == TRUE) {
@@ -26,7 +28,8 @@ solutions_line <-
               mutate(# yr = lubridate::year(weigh_date)
                 yr = year) %>%
               group_by(yr) %>%
-              summarise(mean = mean(value)) %>%
+              summarise(mean = mean(value),
+                        median = median(value)) %>%
               mutate(region = "All regions")
           )
       }
@@ -34,7 +37,16 @@ solutions_line <-
       sum1
     }
     
-    sum2 %>%
+    sum3 <- 
+      if(stat == "mean") {
+        sum2 %>% 
+          rename(stat = mean)
+      } else {
+        sum2 %>% 
+          rename(stat = median)
+      }
+    
+    sum3 %>%
       mutate(
         line =
           case_when(region == "All regions" ~ "twodash",
@@ -43,11 +55,10 @@ solutions_line <-
           case_when(region == "All regions" ~ 2,
                     TRUE ~ 1)
       ) %>%
-      # arrange(desc(mean))
       filter(!yr %in% c(1972, 2019)) %>%
       ggplot(aes(
         x = yr,
-        y = mean,
+        y = stat,
         color = forcats::as_factor(region),
         linetype = line,
         size = size

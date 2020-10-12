@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=160 -j 12 --config &> log/snakemake_log/varcomp_ww/201006.varcomp_ww.log &
+# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=160 -j 24 --config &> log/snakemake_log/varcomp_ww/201008.varcomp_ww.log &
 
 import os
 
@@ -51,7 +51,7 @@ rule copy_par:
     resources:
         load = 20
     input:
-        in_par = "source_functions/par/varcomp_ww.{dataset}.par"
+        in_par = "source_functions/par/varcomp_ww.tworegion.par"
     output:
         out_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/varcomp_ww.par"
     shell:
@@ -84,8 +84,7 @@ rule renf90:
         directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
         renum_out = "renf90.iter{iter}.{dataset}.out"
     output:
-        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par",
-        renum_out = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.iter{iter}.{dataset}.out"
+        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par"
     shell:
         """
         cd {params.directory}
@@ -96,13 +95,11 @@ rule aireml:
     resources:
         load = lambda wildcards: config['resources_key'][wildcards.dataset]
     input:
-        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par",
-        renum_out = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.iter{iter}.{dataset}.out"
+        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par"
     params:
         aireml_path = config['airemlf90_path'],
         directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
         aireml_out = "aireml.iter{iter}.{dataset}.out",
-        psrecord = "/home/agiintern/regions/log/psrecord/varcomp_ww/aireml/aireml.iter{iter}.{dataset}.log",
         aireml_renamed = "airemlf90.iter{iter}.{dataset}.log"
     output:
         aireml_renamed = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log"
@@ -111,6 +108,6 @@ rule aireml:
         cd {params.directory}
         ulimit -S -s unlimited
         ulimit -H -s unlimited
-        psrecord "{params.aireml_path} renf90.par &> {params.aireml_out}" --log {params.psrecord} --include-children --interval 5
+        {params.aireml_path} renf90.par &> {params.aireml_out}
         mv airemlf90.log {params.aireml_renamed}
         """

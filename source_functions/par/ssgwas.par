@@ -1,0 +1,51 @@
+#header: Animal cg region_3 region_other
+DATAFILE
+data.txt
+TRAITS
+3
+FIELDS_PASSED TO OUTPUT
+
+WEIGHT(S)
+
+RESIDUAL_VARIANCE
+1500
+# contemporary group
+EFFECT
+2 cross alpha
+# animal effect
+EFFECT
+1 cross alpha
+RANDOM
+animal
+OPTIONAL
+mat mpe
+FILE
+ped.txt
+FILE_POS
+1 2 3 0 4
+SNP_FILE
+genotypes.txt
+PED_DEPTH
+3
+INBREEDING
+pedigree
+(CO)VARIANCES
+800 -100
+-100 300
+(CO)VARIANCES_MPE
+200
+OPTION minfreq 0.01
+#OPTION no_quality_control
+#OPTION map_file ../../map_file.50k.txt
+OPTION chrinfo ../../chrinfo.50k.txt
+OPTION residual
+OPTION sol se
+OPTION conv_crit 1e-12
+OPTION use_yams
+# http://nce.ads.uga.edu/wiki/lib/exe/fetch.php?media=postgs_sa.pdf
+OPTION saveGInverse
+#OPTION windows_variance 10
+OPTION snp_p_value
+OPTION snp_pev
+OPTION sex_chr 30
+OPTION excludeCHR

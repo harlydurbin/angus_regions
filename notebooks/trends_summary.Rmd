@@ -31,12 +31,12 @@ source(here::here("source_functions/solutions_line.R"))
 # Setup
 
 ```{r}
-cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+cg_regions <- read_rds(here::here("data/derived_data/import_regions/cg_regions.rds"))
 ```
 
 
 ```{r}
-animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+animal_regions <- read_rds(here::here("data/derived_data/import_regions/animal_regions.rds"))
 ```
 
 ---
@@ -152,19 +152,19 @@ ggsave(here::here("figures/ww_pheno.solutions_line_year.png"), width = 10, heigh
 ```{r, fig.width=10, fig.height=5.4}
 
 cg_regions %>%
-  filter(!region %in% c(4, 6)) %>%
   solutions_line(
     effect_var = "cg_sol",
     trait_var = "ww",
-    y_lab = "Mean CG solution",
-    plot_title = "Weaning weight contemporary group solutions reflect\nyear-to-year environmental trends",
-    national_avg = TRUE
+    y_lab = "Mean contemporary group BLUE",
+    plot_title = NULL,
+    national_avg = TRUE,
+    stat = "median"
     ) +
-  lims(y = c(440, 580))
+  scale_x_continuous(breaks = c(1990, 1995, 2000, 2005, 2010, 2015, 2019))
 
 
 
-ggsave(here::here("figures/ww_cg.solutions_line_year.png"), width = 10, height = 5.4)
+ggsave(here::here("figures/ww_cg.solutions_line_year.postfilter.png"), width = 10, height = 5.4)
 ```
 
 ### Breeding value solutions

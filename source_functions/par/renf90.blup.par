@@ -1,0 +1,47 @@
+# BLUPF90 parameter file created by RENUMF90
+DATAFILE
+ renf90.dat
+NUMBER_OF_TRAITS
+           1
+NUMBER_OF_EFFECTS
+           4
+OBSERVATION(S)
+    1
+WEIGHT(S)
+ 
+EFFECTS: POSITIONS_IN_DATAFILE NUMBER_OF_LEVELS TYPE_OF_EFFECT[EFFECT NESTED]
+ 2      4479 cross 
+ 3    201030 cross 
+ 4     201030 cross
+ 4     201030 cross
+RANDOM_RESIDUAL VALUES
+    1500.0000000
+ RANDOM_GROUP
+     2     3
+ RANDOM_TYPE
+ add_an_upginb
+ FILE
+renadd02.ped                                                
+(CO)VARIANCES
+     800.0000000    -100.0000000
+    -100.0000000     300.0000000
+ RANDOM_GROUP
+     4
+ RANDOM_TYPE
+ diagonal     
+ FILE
+                                                            
+(CO)VARIANCES
+     200.0000000
+OPTION SNP_file genotypes.txt
+OPTION minfreq 0.01
+OPTION chrinfo ../../chrinfo.50k.txt
+OPTION residual
+OPTION sol se
+OPTION conv_crit 1e-12
+OPTION use_yams
+OPTION saveGInverse
+OPTION snp_p_value
+OPTION snp_pev
+OPTION sex_chr 30
+OPTION excludeCHR
