@@ -10,11 +10,13 @@ library(readr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+
+source(here::here("source_functions/read_gibbs.R"))
 ```
 
 # Notes & questions
 
-* Assuming effect 0 corresponds to residual?
+* MCE: Assuming effect 0 corresponds to residual?
 * Effective sample size: "At least > 10 is recommended. > 30 may be better."
 * `postgibbs_samples` file: "The meaning of each column is:
     + Column 1: the sequential number for saved samples.
@@ -28,50 +30,71 @@ Sampling parameters:
 * 200,000 samples
 * Keep every 20th sample after 10,000 sample burn-in
 
-# Import "Monte Carlo error by time series"
+# Monte Carlo error by time series
 
-Assuming effect 0 corresponds to residual?
-
-```{r}
+```{r, message= FALSE, warning=FALSE}
 gibbs_mce <-
-  purrr::map2(.x = c(1, 2, 3, 4, 5)) read_table2(here::here("data/derived_data/varcomp_ww/iter2/3v1/postout"), skip = 4, n_max = 15, col_names = c("position", "eff1", "eff2", "trt1", "trt2", "mce", "mean", "hdp", "effective_sample_size", "median", "mode"))
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_mce(iteration = .x,
+                                 region = .y))
 ```
 
-# Import "posterior standard deviation"
+# Posterior standard deviation
 
-```{r}
-read_table2(here::here("data/derived_data/varcomp_ww/iter2/3v1/postout"), skip = 27, n_max = 15, col_names = c("position", "eff1", "eff2", "trt1", "trt2", "psd", "mean", "psd_interval_lo", "psd_interval_hi", "convergence", "auto_lag1", "auto_lag10", "auto_lag50", "independent_batches")) 
+```{r, message= FALSE, warning=FALSE}
+gibbs_psd <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_psd(iteration = .x,
+                                 region = .y))
+
 ```
 
-# Import samples
+# Post burn-in samples
 
-```{r, message=FALSE, warning=FALSE}
-gibbs30 <-
-  c("3v1", "3v2", "3v5", "3v7", "3v8", "3v9") %>%
-  purrr::set_names() %>% 
-  purrr::map_dfr(~ read_table2(here::here(glue::glue("data/derived_data/varcomp_ww/iter2/{.x}/postgibbs_samples")), col_names = FALSE), .id = "region") %>% 
-  janitor::remove_empty(which = c("rows", "cols")) %>% 
-  select(-X3, -X2) %>% 
-  select(region:X18) %>% 
-  tidyr::pivot_longer(cols = X4:X18) %>%
-rename(sample = X1, variable = name)
-```
+```{r, message= FALSE, warning=FALSE}
+gibbs_samples <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_samples(iteration = .x,
+                                 region = .y)) %>% 
+  select(iter, dataset, everything(), -X1, -X3) %>% 
+  purrr::set_names("iter", "dataset", "round", c(1:18)) %>% 
+  tidyr::pivot_longer(cols = c(`1`:`18`),
+                      names_to = "param") %>% 
+  mutate(param = case_when(param == "1" ~ "d1d1",
+                           param == "2" ~ "d1d2",
+                           param == "3" ~ "d1m1",
+                           param == "4" ~ "d1m2",
+                           param == "5" ~ "d2d2",
+                           param == "6" ~ "d2m1",
+                           param == "7" ~ "d2m2",
+                           param == "8" ~ "m1m1",
+                           param == "9" ~ "m1m2",
+                           param == "10" ~ "m2m2",
+                           param == "11" ~ "mpe1mpe1",
+                           param == "12" ~ "mpe2mpe2",
+                           param == "13" ~ "r1r1",
+                           param == "14" ~ "r2r2",
+                           param == "15" ~ "se(d1d2)",
+                           param == "16" ~ "se(m1m2)",
+                           param == "17" ~ "se(d1m1)",
+                           param == "18" ~ "se(d2m2)"))
+``` 
 
 ## Plot samples
 
 ```{r, fig.width=10, fig.height=10}
-gibbs30 %>% 
-  ggplot(aes(x = sample, y = value, color = variable)) +
-  geom_line() +
-  facet_wrap(~ region)
-
-```
-
-```{r, fig.width=5, fig.height=5}
 gibbs_samples %>% 
-  filter(variable == "X9") %>% 
-  filter(region == "3v1") %>% 
-  ggplot(aes(x = value)) +
-  geom_histogram()
+  ggplot(aes(x = round, y = value, color = param)) +
+  geom_line() +
+  facet_wrap(~ dataset)
 
 ```
