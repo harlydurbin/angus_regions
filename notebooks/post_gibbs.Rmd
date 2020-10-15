@@ -1,7 +1,12 @@
 ---
 title: "Post-Gibbs sampling summary"
 author: "Harly Durbin"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 1
+    df_print: paged
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
@@ -10,6 +15,8 @@ library(readr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(glue)
+library(purrr)
 
 source(here::here("source_functions/read_gibbs.R"))
 ```
@@ -27,10 +34,11 @@ source(here::here("source_functions/read_gibbs.R"))
 ---
 
 Sampling parameters:
+
 * 200,000 samples
 * Keep every 20th sample after 10,000 sample burn-in
 
-# Monte Carlo error by time series
+# Monte Carlo error by time series {.tabset}
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_mce <-
@@ -39,8 +47,14 @@ gibbs_mce <-
                   .y = rep(c(1, 2, 5, 7, 8, 9),
                            times = 5),
                   ~ read_gibbs_mce(iteration = .x,
-                                 region = .y))
+                                 region = .y)) %>% 
+  select(iter, dataset, everything())
 ```
+
+```{r, echo=FALSE}
+DT::datatable(gibbs_mce, rownames = FALSE)
+```
+
 
 # Posterior standard deviation
 
@@ -51,8 +65,13 @@ gibbs_psd <-
                   .y = rep(c(1, 2, 5, 7, 8, 9),
                            times = 5),
                   ~ read_gibbs_psd(iteration = .x,
-                                 region = .y))
+                                 region = .y)) %>% 
+  select(iter, dataset, everything())
 
+```
+
+```{r, echo=FALSE}
+DT::datatable(gibbs_psd, rownames = FALSE)
 ```
 
 # Post burn-in samples
@@ -86,15 +105,86 @@ gibbs_samples <-
                            param == "15" ~ "se(d1d2)",
                            param == "16" ~ "se(m1m2)",
                            param == "17" ~ "se(d1m1)",
-                           param == "18" ~ "se(d2m2)"))
+                           param == "18" ~ "se(d2m2)"),
+         iter = as.character(iter))
+  
 ``` 
 
-## Plot samples
+## Plot samples {.tabset}
 
-```{r, fig.width=10, fig.height=10}
+### Iteration 1
+
+```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
-  ggplot(aes(x = round, y = value, color = param)) +
+  filter(iter == 1) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  ggplot(aes(x = round,
+             y = value,
+             color = param)) +
   geom_line() +
-  facet_wrap(~ dataset)
+  theme_classic() +
+  facet_wrap(~ dataset, nrow = 3)
 
 ```
+
+### Iteration 2
+
+```{r, fig.width=12, fig.height=10}
+gibbs_samples %>% 
+  filter(iter == 2) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  ggplot(aes(x = round,
+             y = value,
+             color = param)) +
+  geom_line() +
+  theme_classic() +
+  facet_wrap(~ dataset, nrow = 3)
+
+```
+
+### Iteration 3
+
+```{r, fig.width=12, fig.height=10}
+gibbs_samples %>% 
+  filter(iter == 3) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  ggplot(aes(x = round,
+             y = value,
+             color = param)) +
+  geom_line() +
+  theme_classic() +
+  facet_wrap(~ dataset, nrow = 3)
+
+```
+
+### Iteration 4
+
+```{r, fig.width=12, fig.height=10}
+gibbs_samples %>% 
+  filter(iter == 4) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  ggplot(aes(x = round,
+             y = value,
+             color = param)) +
+  geom_line() +
+  theme_classic() +
+  facet_wrap(~ dataset, nrow = 3)
+
+```
+
+
+### Iteration 5
+
+```{r, fig.width=12, fig.height=10}
+gibbs_samples %>% 
+  filter(iter == 5) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  ggplot(aes(x = round,
+             y = value,
+             color = param)) +
+  geom_line() +
+  theme_classic() +
+  facet_wrap(~ dataset, nrow = 3)
+
+```
+

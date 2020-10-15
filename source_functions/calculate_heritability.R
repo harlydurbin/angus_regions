@@ -25,19 +25,22 @@ biv_heritability <-
           ),
         # Direct/maternal covariance
         val1 =
-          case_when(
-            val1 == glue::glue("{r1_abbrv}_dir") &
-              val2 == glue::glue("{r1_abbrv}_mat") ~ glue::glue("{r1_abbrv}_dir_mat"),
-            val1 == glue::glue("{r2_abbrv}_dir") &
-              val2 == glue::glue("{r2_abbrv}_mat") ~ glue::glue("{r2_abbrv}_dir_mat"),
-            TRUE ~ val1
-          ),
-        val2 = if_else(str_detect(val1, "dir_mat"), val1, val2)
-      ) %>%
+          case_when(val1 == glue::glue("{r1_abbrv}_dir") &
+                      val2 == glue::glue("{r1_abbrv}_mat") ~
+                      glue::glue("{r1_abbrv}_dir_mat"),
+                    val1 == glue::glue("{r2_abbrv}_dir") &
+                      val2 == glue::glue("{r2_abbrv}_mat") ~
+                      glue::glue("{r2_abbrv}_dir_mat"),
+                    TRUE ~ val1),
+        val2 = if_else(str_detect(val1,
+                                  "dir_mat"),
+                       val1,
+                       val2)) %>%
       filter(val1 == val2) %>%
       select(-val2) %>%
       # Pivot to wide format
-      mutate(val1 = str_remove(val1, glue::glue("{r1_abbrv}_|{r2_abbrv}_"))) %>%
+      mutate(val1 = str_remove(val1,
+                               glue::glue("{r1_abbrv}_|{r2_abbrv}_"))) %>%
       tidyr::pivot_wider(id_cols = key,
                          names_from = val1,
                          values_from = var_cov)

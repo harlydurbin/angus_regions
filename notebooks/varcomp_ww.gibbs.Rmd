@@ -1,0 +1,138 @@
+---
+title: "Genetic correlations & variance components from bivariate Gibbs sampling models"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(glue)
+library(stringr)
+library(magrittr)
+library(tibble)
+library(purrr)
+library(ggplot2)
+library(rlang)
+library(tidylog)
+
+source(here::here("source_functions/calculate_heritability.R"))
+source(here::here("source_functions/read_gibbs.R"))
+source(here::here("source_functions/region_key.R"))
+
+```
+
+# Notes & questions
+
+# Setup 
+
+```{r, warning=FALSE, message=FALSE}
+gibbs_varcomp <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_varcov(iteration = .x,
+                                      dataset = .y)) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+gibbs_corr <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_corr(iteration = .x,
+                                    dataset = .y)) 
+```
+
+```{r, warning=FALSE, message=FALSE}
+gibbs_h2 <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_h2(iteration = .x,
+                                  dataset = .y)) 
+```
+
+# Heritabilities
+
+```{r}
+gibbs_h2 %>% 
+  select(Comparison = key, Iteration = iter, everything()) %>% 
+  arrange(Comparison, Iteration)
+```
+
+# Genetic correlations
+
+## Weaning weight direct, High Plains vs. other
+
+```{r}
+gibbs_corr %>% 
+  filter(str_detect(val1, "3_dir")) %>% 
+  filter(str_detect(val2, "dir") & !str_detect(val2, "3")) %>% 
+  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>% 
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  arrange(Comparison, Iteration)
+```
+
+```{r}
+gibbs_corr %>% 
+  filter(str_detect(val1, "3_dir")) %>% 
+  filter(str_detect(val2, "dir") & !str_detect(val2, "3")) %>% 
+  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>% 
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  group_by(Comparison) %>% 
+  summarise(`Min.` = min(Correlation),
+            Mean = mean(Correlation),
+            `Max.` = max(Correlation),
+            SD = sd(Correlation))
+```
+
+## Maternal effect, High Plains vs. other
+
+```{r}
+gibbs_corr %>% 
+  filter(str_detect(val1, "3_mat")) %>% 
+  filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
+  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>% 
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  arrange(Comparison, Iteration)
+```
+
+```{r}
+gibbs_corr %>% 
+  filter(str_detect(val1, "3_mat")) %>% 
+  filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
+  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>% 
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  group_by(Comparison) %>% 
+  summarise(`Min.` = min(Correlation),
+            Mean = mean(Correlation),
+            `Max.` = max(Correlation),
+            SD = sd(Correlation))
+```

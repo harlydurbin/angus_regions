@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/varcomp_ww.gibbs.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=120 -j 12 --config --until gibbs &> log/snakemake_log/varcomp_ww.gibbs/201009.varcomp_ww.gibbs.log &
+# nohup snakemake -s source_functions/varcomp_ww.gibbs.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=120 -j 36 --config &> log/snakemake_log/varcomp_ww.gibbs/201014.varcomp_ww.gibbs.log &
 
 import os
 
@@ -41,7 +41,6 @@ rule sample:
     output:
         datafile = expand("data/derived_data/varcomp_ww/iter{{iter}}/{dataset}/data.txt", dataset = config['dataset']),
         pedfile = expand("data/derived_data/varcomp_ww/iter{{iter}}/{dataset}/ped.txt", dataset = config['dataset']),
-        pull_list = "data/derived_data/varcomp_ww/iter{iter}/pull_list.txt",
         summary = "data/derived_data/varcomp_ww/iter{iter}/varcomp_ww.data_summary.iter{iter}.csv"
     shell:
         "Rscript --vanilla {input.script} {params.iter} &> log/rule_log/varcomp_ww/sample/sample.iter{params.iter}.log"
@@ -63,21 +62,6 @@ rule copy_par:
         cp {input.in_par} {output.out_par}
         cp {input.in_data} {output.out_data}
         cp {input.in_ped} {output.out_ped}
-        """
-
-# Left join genotypes in master genotype file to list of genotyped animals to be used
-rule pull_genotypes:
-    resources:
-        load = 30
-    input:
-        pullfile = "data/derived_data/varcomp_ww/iter{iter}/pull_list.txt"
-    params:
-        master_geno = config['master_geno']
-    output:
-        reduced_geno = "data/derived_data/varcomp_ww/iter{iter}/genotypes.iter{iter}.txt"
-    shell:
-        """
-        grep -Fwf {input.pullfile} {params.master_geno} | awk '{{printf "%-25s %s\\n", $1, $2}}' &> {output.reduced_geno}
         """
 
 rule renf90:
@@ -103,7 +87,7 @@ rule renf90:
 
 rule gibbs:
     resources:
-        load = 10
+        load = 5
     input:
         renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/renf90.par",
         renum_out = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/renf90.gibbs.iter{iter}.{dataset}.out"

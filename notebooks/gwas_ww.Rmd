@@ -44,10 +44,14 @@ options(scipen=999)
     + Peaks that appear in one region but not the other?
 * Color significant SNPs based on whether or not they're found in the other analysis?
 * Maybe start truncating at 2000 instead of 1990?
+* Why did I end up using univariate results rather than bivariate?
 
  CONVERT_HASH_IJA_GENERAL: too many elements found in a hash matrix
  The upper limit & actual number of elements  2,147,483,647           10,965,740,000
 
+@deckerje I'm not sure why I agreed during lab meeting yesterday that I could go ahead and run SNP1101 - THRGIBBS only calculates variance components, not breeding values. So, I'll need to run BLUPF90 to calculate breeding values first. 
+
+I might have misunderstood, but I was pretty certain that in conversations previous to yesterday we'd discussed and settled on running univariate GWAS by region, which I took to mean also calculating the breeding values used as phenotypes in the GWAS using a univariate model. 
 
 # Setup
 
@@ -58,14 +62,13 @@ options(scipen=999)
     + Fescue Belt, spring & fall calving
     + High Plains, spring & fall calving
 
-```{r}
+```{r, message=FALSE, warning=FALS}
 analyses <- c("2_spring", "2_all", "8_spring", "8_all", "3_all")
 
 analyses_regions <- c(2, 2, 8, 8, 3)
 ```
 
-
-```{r}
+```{r, message=FALSE, warning=FALS}
 
 snp_sol <-
   purrr::map2(
@@ -75,6 +78,16 @@ snp_sol <-
   ) %>%
   reduce(bind_rows)
 
+```
+
+```{r, message=FALSE, warning=FALS}
+snp_sol_biv <- 
+  read_snp_sol_ww(r1 = 3,
+                  r2 = 2,
+                  analysis = "3v2_all") %>% 
+  bind_rows(read_snp_sol_ww(r1 = 3,
+                            r2 = 8,
+                            analysis = "3v8_all"))
 ```
 
 * Sliding window variance from same 5 GWAS
@@ -96,8 +109,6 @@ region_key %<>%
   mutate(desc = as_factor(desc),
          desc = fct_inorder(desc))
 ```
-
-
 
 # Weaning weight direct
 
@@ -191,6 +202,21 @@ snp_sol %>%
 ggsave(here::here("figures/gwas_ww/ww_dir.manhattan_p.3v2v8_all.png"),
       width = 12,
        height = 7)
+```
+
+### Bivariate
+
+```{r fig.width = 12, fig.height=7}
+
+snp_sol_biv %>%
+  filter(effect == "direct") %>%
+  filter(region %in% c(2, 8)) %>% 
+  regions_manhattan(y_var = neglog10p,
+                    y_lab = "-log10(p-value)",
+                    plot_title = "Weaning weight (direct effect): bivariate model",
+                    facet = TRUE,
+                    sigline = TRUE,
+                    nfacets = 2)
 ```
 
 

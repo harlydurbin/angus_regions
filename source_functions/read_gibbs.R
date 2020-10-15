@@ -82,3 +82,102 @@ read_gibbs_psd <- function(iteration, region) {
   }
   
 }
+
+read_gibbs_corr <- function(iteration, dataset) {
+  
+  fp <- glue::glue("data/derived_data/varcomp_ww/iter{iteration}/3v{dataset}/gibbs/postmeanCorr")
+  
+  if (file.exists(here::here(fp))) {
+    corrmat <-
+      readr::read_table2(here::here(fp),
+                         skip = 1,
+                         n_max = 4,
+                         col_names = FALSE) %>% 
+      janitor::remove_empty(which = c("rows", "cols")) %>% 
+      purrr::set_names("3_dir", glue("{dataset}_dir"), "3_mat", glue("{dataset}_mat")) %>% 
+      as.matrix()
+    
+    corrmat[lower.tri(corrmat, diag = TRUE)] <- rlang::na_dbl
+    
+    corrmat %>%
+      tibble::as.tibble() %>% 
+      dplyr::mutate(val1 = colnames(.)) %>%
+      tidyr::pivot_longer(-val1,
+                          names_to = "val2",
+                          values_to = "corr") %>% 
+      dplyr::filter(!is.na(corr)) %>% 
+      mutate(iter = iteration)
+  
+  }
+}
+
+read_gibbs_varcov <- function(iteration, dataset) {
+  
+  fp <- glue("data/derived_data/varcomp_ww/iter{iteration}/3v{dataset}/gibbs/postmean")
+  
+  if (file.exists(here::here(fp))) {
+    
+    g_cov <-
+      read_table2(here::here(fp),
+                  skip = 1,
+                  n_max = 4,
+                  col_names = FALSE) %>% 
+      janitor::remove_empty(which = c("rows", "cols")) %>% 
+      purrr::set_names("3_dir", glue("{dataset}_dir"), "3_mat", glue("{dataset}_mat")) %>% 
+      dplyr::mutate(val1 = colnames(.)) %>%
+      tidyr::pivot_longer(-val1,
+                          names_to = "val2",
+                          values_to = "var_cov") 
+    
+    mpe_cov <-
+      read_table2(here::here(fp),
+                  skip = 6,
+                  n_max = 2,
+                  col_names = FALSE) %>% 
+      janitor::remove_empty(which = c("rows", "cols")) %>% 
+      purrr::set_names("3_mpe", glue("{dataset}_mpe")) %>% 
+      dplyr::mutate(val1 = colnames(.)) %>%
+      tidyr::pivot_longer(-val1,
+                          names_to = "val2",
+                          values_to = "var_cov")
+    
+    r_cov <-
+      read_table2(here::here(fp),
+                  skip = 9,
+                  n_max = 2,
+                  col_names = FALSE) %>% 
+      janitor::remove_empty(which = c("rows", "cols")) %>% 
+      purrr::set_names("r3", glue("r{dataset}")) %>% 
+      dplyr::mutate(val1 = colnames(.)) %>%
+      tidyr::pivot_longer(-val1,
+                          names_to = "val2",
+                          values_to = "var_cov") 
+    
+    bind_rows(g_cov,
+              mpe_cov,
+              r_cov) %>% 
+      mutate(iter = iteration)
+    
+  }
+}
+
+read_gibbs_h2 <- function(iteration, dataset) {
+  
+  source(here::here("source_functions/region_key.R"))
+  
+  
+  desc1 <- "High Plains"
+  
+  desc2 <- 
+    region_key %>% 
+    filter(num == dataset) %>% 
+    pull(desc)
+  
+  read_gibbs_varcov(iteration = iteration, 
+                    dataset = dataset) %>% 
+    biv_heritability(abbrvs = c("3", as.character(dataset)),
+                     descs = c(desc1, desc2),
+                     mat = TRUE,
+                     mpe = TRUE) %>% 
+    mutate(iter = iteration)
+}
