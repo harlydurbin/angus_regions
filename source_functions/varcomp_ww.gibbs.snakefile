@@ -46,7 +46,7 @@ rule sample:
         "Rscript --vanilla {input.script} {params.iter} &> log/rule_log/varcomp_ww/sample/sample.iter{params.iter}.log"
 
 # Copy par file for tworegion datasets
-rule copy_par:
+rule copy_data:
     resources:
         load = 20
     input:

@@ -1,0 +1,34 @@
+title
+       "maternal";
+
+gfile
+       "../genotypes.txt";
+
+mapfile
+       "/storage/hpc/group/UMAG/WORKING/hjdzpd/mizzou_hairshed/data/raw_data/geno_dump/200924_HairShed.850K.chrinfo.txt";
+
+pedfile
+      "./ped.txt";
+
+traitfile
+       name "maternal"
+       file "./trait_maternal.txt"
+       est 1
+       skip 1;
+
+qc
+       maf_range 0.0 0.5;
+
+gwas ssr
+       kinship file "../gmtx_grm.bin"
+       wt rel
+       maf_range 0.0 0.5
+       mca gwise fdr
+       plot
+       plot qq;
+
+nthread
+      12;
+
+output_folder
+       "./maternal_gwas";
