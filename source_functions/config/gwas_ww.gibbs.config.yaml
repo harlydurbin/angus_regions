@@ -8,10 +8,4 @@ master_map: 'data/raw_data/angus_map'
 
 iter: ['1', '2', '3', '4', '5']
 
-# dataset: ['3v1', '3v2', '3v5', '3v7', '3v8', '3v9']
-
-dataset: ['3v2']
-
-effect: ['direct', 'maternal']
-
-snp1101_path: "/usr/angus/snp1101"
+dataset: ['3v2', '3v7', '3v8']
