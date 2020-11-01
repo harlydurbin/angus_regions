@@ -101,13 +101,8 @@ dataset_ped %>%
 #' # Genotyped pull list
 #'
 ## ------------------------------------------------------------------------
-pull_list <-
-  dataset_ped %>%
+alliter %>%
   select(format_reg) %>%
-  bind_rows(dataset_ped %>%
-              select(format_reg = sire_reg)) %>%
-  bind_rows(dataset_ped %>%
-              select(format_reg = dam_reg)) %>%
   distinct() %>%
   left_join(genotyped %>%
               mutate(genotyped = TRUE)) %>%

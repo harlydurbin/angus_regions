@@ -11,17 +11,15 @@
 #     + p. 116: "The reliability of the estimated breeding value of an animal can be calculated with the solutions from BLUPF90"
 # acc <- (1-(se^2))/u
 
-calculate_acc <- function(e, u, se, option = "reliability") {
-  
-  # 10/19/20 Took out multiplication by residual variance
-  PEV <- (se ^ 2) #* e
+calculate_acc <- function(u, se, f, option = "reliability") {
+  PEV <- (se ^ 2)
   
   acc <- if (option == "reliability") {
-    1 - (PEV / u)
+    1 - (PEV / ((1+f)*u))
   } else if(option == "bif"){
-
-    1 - sqrt(PEV / u)
-
+    
+    1 - sqrt((PEV / ((1+f)*u)))
+    
   }
   
   return(acc)

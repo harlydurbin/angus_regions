@@ -1,0 +1,9 @@
+OPTION SNP_file genotypes.txt
+OPTION minfreq 0.01
+OPTION chrinfo ~/regions/data/derived_data/chrinfo.50k.txt
+OPTION readGInverse
+OPTION windows_variance 10
+OPTION snp_p_value
+OPTION snp_pev
+OPTION sex_chr 30
+OPTION excludeCHR

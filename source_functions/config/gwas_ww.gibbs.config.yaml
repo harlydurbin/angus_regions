@@ -6,6 +6,8 @@ master_geno: 'data/raw_data/aaa50snp.dat'
 
 master_map: 'data/raw_data/angus_map'
 
+postgsf90_path: "/usr/local/bin/postGSf90"
+
 iter: ['1', '2', '3', '4', '5']
 
-dataset: ['3v2', '3v7', '3v8']
+dataset: ['3v1', '3v2', '3v5', '3v7', '3v8', '3v9']

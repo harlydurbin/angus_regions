@@ -10,6 +10,9 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(glue)
+library(magrittr)
+library(optiSel)
+library(DRP)
 
 source(here::here("source_functions/calculate_acc.R"))
 
@@ -17,15 +20,12 @@ options(scipen=999)
 
 #'
 ## -----------------------------------------------------------------------------------------------------
-iter <- as.character(commandArgs(trailingOnly = TRUE)[1])
 
-dataset <- as.character(commandArgs(trailingOnly = TRUE)[2])
+dataset <- as.character(commandArgs(trailingOnly = TRUE)[1])
 
 #'
 ## -----------------------------------------------------------------------------------------------------
-blup_dir <- glue("data/derived_data/gwas_ww.gibbs/iter{iter}/{dataset}")
-
-postmean <- glue("data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/postmean")
+blup_dir <- glue("data/derived_data/gwas_ww.gibbs/{dataset}")
 
 region_num <- as.numeric(str_extract(dataset, "(?<=3v)[1-9]"))
 
