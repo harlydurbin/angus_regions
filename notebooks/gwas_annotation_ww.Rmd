@@ -24,6 +24,8 @@ library(magrittr)
 library(purrr)
 library(qvalue)
 library(tidylog)
+library(GALLO)
+library(gprofiler2)
 
 
 source(here::here("source_functions/region_key.R"))
@@ -38,83 +40,326 @@ options(scipen=999)
 # Setup 
 
 * SNP solutions & p-values from 5 GWAS:
-    + Southeast, spring calving only
     + Southeast, spring & fall calving
-    + Fescue Belt, spring calving only
     + Fescue Belt, spring & fall calving
     + High Plains, spring & fall calving
 
 ```{r}
-analyses <- c("2_spring", "2_all", "8_spring", "8_all", "3_all")
 
-analyses_regions <- c(2, 2, 8, 8, 3)
-```
-
-
-```{r}
-
-snp_sol <-
-  purrr::map2(
-    .x = analyses_regions,
-    .y = analyses,
-    ~ read_snp_sol_ww(r1 = .x, analysis = .y)
-  ) %>%
+snp_sol238 <-
+  purrr::map2(.x = c(2, 8, 3),
+              .y = c("2_all", "8_all", "3_all"),
+              ~ read_snp_sol_ww(r1 = .x, analysis = .y)) %>%
   reduce(bind_rows)
 
 ```
 
+```{r}
+pass <-
+  snp_sol238 %>% 
+  filter(neglog10p > 5) %>% 
+  select(region, effect, CHR = chr, BP = pos)
+  
+```
 
 ```{r}
-top_snps <-
-  snp_sol %>% 
-  group_by(analysis, effect) %>% 
+pass %>% 
+  group_by(region, effect) %>% 
+  tally(sort = TRUE)
+```
+
+
+## GTF & GFF files
+
+```{r}
+ensembl_genes <-
+  import_gff_gtf(db_file = here::here("data/raw_data/Bos_taurus.UMD3.1.94.chr.gtf"),
+                 file_type = "gtf")
+```
+
+```{r}
+qtl <-
+  import_gff_gtf(db_file = here::here("data/raw_data/qdwnldLTLSFVKSNW.txt"),
+                 file_type = "gff")
+```
+
+# Annotations
+
+## Genes
+
+```{r}
+dir_gene50k <-
+  map_dfr(.x = c(2, 3, 8),
+          ~ pass %>% 
+            filter(effect == "direct") %>% 
+            filter(region == .x) %>% 
+            select(-region, -effect) %>% 
+            find_genes_qtls_around_markers(db_file = ensembl_genes,
+                                           marker_file = .,
+                                           method = c("gene"),
+                                           marker = c("snp"),
+                                           interval = 50000) %>% 
+            mutate(region = .x))
+```
+
+```{r}
+mat_gene50k <-
+  map_dfr(.x = c(2, 3, 8),
+          ~ pass %>% 
+            filter(effect == "maternal") %>% 
+            filter(region == .x) %>% 
+            select(-region, -effect) %>% 
+            find_genes_qtls_around_markers(db_file = ensembl_genes,
+                                           marker_file = .,
+                                           method = c("gene"),
+                                           marker = c("snp"),
+                                           interval = 50000) %>% 
+            mutate(region = .x))
+```
+
+## QTL
+
+```{r}
+dir_qtl50k <-
+  map_dfr(.x = c(2, 3, 8),
+          ~ pass %>% 
+            filter(effect == "direct") %>% 
+            filter(region == .x) %>% 
+            select(-region, -effect) %>% 
+            find_genes_qtls_around_markers(db_file = qtl,
+                                           marker_file = .,
+                                           method = c("qtl"),
+                                           marker = c("snp"),
+                                           interval = 50000) %>% 
+            mutate(region = .x))
+```
+
+```{r}
+mat_qtl50k <-
+  map_dfr(.x = c(2, 3, 8),
+          ~ pass %>% 
+            filter(effect == "maternal") %>% 
+            filter(region == .x) %>% 
+            select(-region, -effect) %>% 
+            find_genes_qtls_around_markers(db_file = qtl,
+                                           marker_file = .,
+                                           method = c("qtl"),
+                                           marker = c("snp"),
+                                           interval = 50000) %>% 
+            mutate(region = .x))
+```
+
+# Enrichment
+
+## Genes
+
+```{r}
+
+dir_gene_enrich50k <-
+  purrr::map(.x = c(2, 3, 8),
+             ~ dir_gene50k %>% 
+               filter(region == .x) %>% 
+               mutate(id = if_else(!is.na(gene_name), gene_name, gene_id)) %>%
+               distinct(id) %>% 
+               pull(id) %>% 
+               as.list() %>% 
+               purrr::set_names() %>% 
+               gost(organism = "btaurus",
+                    significant = TRUE))
+  
+```
+
+```{r}
+
+mat_gene_enrich50k <-
+  purrr::map(.x = c(2, 3, 8),
+             ~ mat_gene50k %>% 
+               filter(region == .x) %>% 
+               mutate(id = if_else(!is.na(gene_name), gene_name, gene_id)) %>%
+               distinct(id) %>% 
+               pull(id) %>% 
+               as.list() %>% 
+               purrr::set_names() %>% 
+               gost(organism = "btaurus",
+                    significant = TRUE))
+  
+```
+
+```{r}
+mat_go <-
+  purrr::map2_dfr(.x = c(1, 2, 3),
+                .y = c(2, 3, 8),
+                ~ mat_gene_enrich50k[[.x]]$result %>% 
+                  mutate(region = .y)) %>% 
+  select(region, term_name, p_value, everything())
+```
+
+## QTL
+
+```{r}
+
+dir_qtl_enrich50k <-
+  purrr::map_dfr(.x = c(2, 3, 8),
+                 ~ dir_qtl50k %>% 
+                   filter(region == .x) %>% 
+                   select(-region) %>% 
+                   qtl_enrich(qtl_db = qtl,
+                              qtl_file = .,
+                              qtl_type = "Name",
+                              enrich_type = "genome",
+                              padj = "BH") %>% 
+                   mutate(region = .x))
+  
+```
+
+```{r}
+
+mat_qtl_enrich50k <-
+  purrr::map_dfr(.x = c(2, 3, 8),
+                 ~ mat_qtl50k %>% 
+                   filter(region == .x) %>% 
+                   select(-region) %>% 
+                   qtl_enrich(qtl_db = qtl,
+                              qtl_file = .,
+                              qtl_type = "Name",
+                              enrich_type = "genome",
+                              padj = "BH") %>% 
+                   mutate(region = .x))
+  
+```
+
+# Gene & ontology enrichment results
+
+## Direct
+
+```{r}
+dir_gene50k
+```
+
+## Region 2 maternal
+
+```{r}
+mat_gene50k %>% 
+  filter(region == 2) %>% 
+  left_join(snp_sol238 %>% 
+              filter(region == 2 & effect == "maternal") %>% 
+              select(CHR = chr, BP = pos, neglog10p)) %>% 
   arrange(desc(neglog10p)) %>% 
-  slice(1:100) %>% 
-  ungroup()
+  select(neglog10p, gene_name, everything())
+
+```
+
+```{r}
+mat_gene50k %>% 
+  filter(region == 2) %>% 
+  group_by(chr, gene_id, gene_name, gene_biotype) %>% 
+  tally(sort = TRUE)
+```
+
+```{r}
+mat_gene50k %>% 
+  filter(region == 2) %>% 
+  filter(chr == 23) %>% 
+  left_join(snp_sol238 %>% 
+              filter(region == 2 & effect == "maternal" & chr == 23) %>% 
+              select(CHR = chr, BP = pos, neglog10p)) %>% 
+  arrange(desc(neglog10p)) %>% 
+  select(neglog10p, everything())
+
+```
+
+## Region 8 maternal
+
+```{r}
+mat_gene50k %>% 
+  filter(region == 8) %>% 
+  filter(chr == 1) %>% 
+  left_join(snp_sol238 %>% 
+              filter(region == 8 & effect == "maternal" & chr == 1) %>% 
+              select(CHR = chr, BP = pos, neglog10p)) %>% 
+  arrange(desc(neglog10p)) %>% 
+  select(neglog10p, everything())
+
+```
+
+# QTL enrichment results
+
+## Direct effect
+
+```{r}
+dir_qtl_enrich50k %>% 
+  filter(0.05 > adj.pval) %>% 
+  filter(N_QTLs > 1) %>% 
+  left_join(dir_qtl50k %>% 
+              select(QTL = trait_ID, CHR, BP, region)) %>% 
+  left_join(dir_gene50k %>% 
+              select(gene_name, CHR, BP, region)) %>% 
+  filter(!is.na(gene_name)) %>% 
+  distinct(QTL, adj.pval, gene_name, region) %>% 
+  arrange(region, adj.pval, gene_name) %>% 
+  group_by(QTL, adj.pval, region) %>% 
+  nest(gene_name) %>% 
+  ungroup() %>% 
+  mutate(string = purrr::map_chr(.x = data, 
+                                 ~ .x %>% 
+                                   pull(gene_name) %>% 
+                                   glue_collapse(sep = ", ")),
+         region = case_when(region == 2 ~ "Southeast", 
+                            region == 3 ~ "High Plains",
+                            region == 8 ~ "Fescue Belt")) %>% 
+    select(-data) %>% 
+  writexl::write_xlsx("~/Desktop/dirqtl.xlsx")
   
 ```
 
 
 ```{r}
-
-writesnps <- 
-  function(run, eff) {
-    
-    snp_sol %>% 
-      filter(analysis == run) %>% 
-      filter(effect == eff) %>% 
-      arrange(desc(neglog10p)) %>% 
-      slice(1:100) %>% 
-      mutate(query = glue("{chr}:{pos}")) %>% 
-      select(query) %>% 
-      write_tsv(here::here(glue("data/derived_data/query.{run}.{eff}.txt")), col_names = FALSE)
-      
-  }
-
-
+dir_qtl50k %>% 
+  filter(chr == 20) %>% 
+  filter(trait_ID == "Body weight (weaning)") %>% 
+  left_join(dir_gene50k %>% 
+              select(CHR, BP, gene_name)) %>% 
+  select(gene_name, everything()) %>% 
+  group_by(gene_name) %>% 
+  tally(sort = TRUE)
 ```
 
-# Annotations
+## Maternal effect
 
 ```{r}
-snp_sol %>% 
-  filter(analysis == "8_spring") %>% 
-  filter(effect == "maternal") %>% .
-  filter(chr == 9) %>% 
-  arrange(pval) %>% 
-  select(neglog10p, snp_effect, pos, everything()) %>% 
-  View()
+mat_qtl_enrich50k %>% 
+  filter(0.05 > adj.pval) %>% 
+  left_join(mat_qtl50k %>% 
+              select(QTL = trait_ID, CHR, BP, region)) %>% 
+  left_join(mat_gene50k %>% 
+              select(gene_name, CHR, BP, region)) %>% 
+  filter(!is.na(gene_name)) %>% 
+  distinct(QTL, adj.pval, gene_name, region) %>% 
+  arrange(region, adj.pval, gene_name) %>% 
+  group_by(QTL, adj.pval, region) %>% 
+  nest(gene_name) %>% 
+  ungroup() %>% 
+  mutate(string = purrr::map_chr(.x = data, 
+                                 ~ .x %>% 
+                                   pull(gene_name) %>% 
+                                   glue_collapse(sep = ", ")),
+         region_name = case_when(region == 2 ~ "Southeast", 
+                            region == 3 ~ "High Plains",
+                            region == 8 ~ "Fescue Belt")) %>% 
+    select(-data) %>% 
+  writexl::write_xlsx("~/Desktop/matqtl.xlsx")
+  
 ```
-
-
 
 ```{r}
-purrr::map2(
-  .x = c("2_spring", "8_spring", "8_spring", "2_all", "8_all", "2_all", "3_all"),
-  .y = c("maternal", "maternal", "direct", "maternal", "maternal", "direct", "direct"), 
-  ~ writesnps(run = .x,
-              eff = .y)
-)
+mat_qtl_enrich50k %>% 
+  select(dataset, adj.pval, everything()) %>% 
+  filter(QTL != "") %>% 
+  filter(dataset != 3) %>% 
+  filter(0.05 > adj.pval) %>% 
+  #filter(N_QTLs > 1) %>% 
+  select(dataset, QTL_type, everything())
 ```
+
 
 # Commentary

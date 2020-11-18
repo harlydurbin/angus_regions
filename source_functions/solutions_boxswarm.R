@@ -16,24 +16,21 @@ solutions_boxswarm <- function(df, effect_var, trait_var, y_title, plot_title){
       "1" = "tomato2",
       "2" = "darkslategray4",
       "3" = "springgreen3",
-      "4" = "brown",
       "5" = "goldenrod1",
-      "6" = "gray50",
       "7" = "deeppink3",
       "8" = "gray17",
       "9" = "slateblue2"
     ),
     labels = c(
-      "1" = "1: Desert",
-      "2" = "2: Southeast",
-      "3" = "3: High Plains",
-      "4" = "4: Rainforest",
-      "5" = "5: Arid Prairie",
-      "6" = "6: Cold Desert",
-      "7" = "7: Forested Mountains",
-      "8" = "8: Fescue Belt",
-      "9" = "9: Upper Midwest & Northeast"
-    )
+      "1" = "Desert",
+      "2" = "Southeast",
+      "3" = "High Plains",
+      "5" = "Arid Prairie",
+      "7" = "Forested Mountains",
+      "8" = "Fescue Belt",
+      "9" = "Upper Midwest & Northeast"
+    ),
+    # breaks = c("1: Desert", "2: Southeast", "3: High Plains", "5: Arid Prairie", "7: Forested Mountains", "8: Fescue Belt", "9: Upper Midwest & Northeast")
   ) +
   ggplot2::geom_boxplot(
     aes(
@@ -55,7 +52,7 @@ solutions_boxswarm <- function(df, effect_var, trait_var, y_title, plot_title){
       "8" = "gray17",
       "9" = "slateblue2"
     )
-  ) +
+  ) +  
   ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(alpha = 1))) +
   ggplot2::theme_classic() +
   ggplot2::theme(

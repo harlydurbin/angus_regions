@@ -31,7 +31,6 @@ source(here::here("source_functions/region_key.R"))
 
 ```
 
-
 # Notes & questions
 
 # Setup
@@ -58,26 +57,20 @@ source(here::here("source_functions/region_key.R"))
 corr_iters <-
   tibble(iter = c(1:10)) %>% 
   expand(iter, region = c(1, 2, 5, 7, 8, 9)) %>% 
-  mutate(data = 
-           purrr::map2( .x = iter, .y = region,
-             ~ read_bootstrap_corrs(iteration = .x, r1 = 3, r2 = .y)
-             )
-         ) %>% 
+  mutate(data = purrr::map2(.x = iter,
+                            .y = region,
+             ~ read_bootstrap_corrs(iteration = .x, r1 = 3, r2 = .y))) %>% 
   unnest() %>% 
-  left_join(
-    region_key %>% 
-      select(region = num,
-             desc)
-  ) %>% 
+  left_join(region_key %>% 
+              select(region = num, desc)) %>% 
   mutate(run = as.character(glue("iter{iter}_3v{region}"))) %>% 
-  select(
-    iteration = iter,
-    region = desc,
-    effect_1,
-    effect_2,
-    corr,
-    run
-  )
+  select(iteration = iter,
+         region = desc,
+         val1,
+         val2,
+         corr,
+         run)
+
 ```
 
 ```{r, message=FALSE}
@@ -85,29 +78,61 @@ corr_iters <-
 bootstrap_h2s <-
   tibble(iter = c(1:10)) %>% 
   expand(iter, region = c(1, 2, 5, 7, 8, 9)) %>% 
-  mutate(data = 
-           purrr::map2(.x = iter, .y = region, ~ read_bootstrap_h2(iteration = .x, r1 = 3, r2 = .y))) %>% 
+  mutate(data = purrr::map2(.x = iter,
+                            .y = region,
+                            ~ read_bootstrap_h2(iteration = .x, r1 = 3, r2 = .y))) %>% 
   unnest()
 
 ```
 
 # Heritabilities
 
+## $h^2_D$
+
+```{r}
+bootstrap_h2s %>% 
+  group_by(key) %>% 
+  summarise(`Min h2D` = min(`Direct h2`),
+            `Mean h2D` = mean(`Direct h2`),
+            `Max h2D` = max(`Direct h2`),
+            n = n())
+  
+``` 
+
+## $h^2_M$
+
 ```{r, eval=FALSE}
 bootstrap_h2s %>% 
   group_by(key) %>% 
-  summarise(mean(`Direct h2`), sd(`Direct h2`), n = n())
+  summarise(`Min h2M` = min(`Maternal h2`),
+            `Mean h2M` = mean(`Maternal h2`),
+            `Max h2M` = max = max(`Maternal h2`),
+            n = n())
+  
+``` 
+
+## $c^2#
+
+
+```{r, eval=FALSE}
+bootstrap_h2s %>% 
+  group_by(key) %>% 
+  summarise(`Min c2` = min(`MPE c2`),
+            `Mean c2` = mean(`MPE c2`),
+            `Max c2` = max(`MPE c2`),
+            n = n())
   
 ``` 
 
 # Genetic correlations
 
-> Direct
+## HP direct & other direct
 
 ```{r}
-
-corr_iters %>% 
-  filter_at(vars(contains("effect")), all_vars(str_detect(., "direct"))) %>% 
+purrr::map_dfr(.x = c("D", "SE", "AP", "FM", "FB", "UMWNE"),
+               ~ corr_iters %>% 
+                 filter_at(vars(contains("val")), all_vars(str_detect(., "direct"))) %>% 
+                 filter(str_detect(val1, .x) & str_detect(val2, "HP"))) %>% 
   mutate(region = glue("{region} (direct)")) %>% 
   group_by(region) %>% 
   summarise(
@@ -121,11 +146,13 @@ corr_iters %>%
 
 ```
 
-> Maternal
+## HP maternal & other maternal
 
 ```{r}
-corr_iters %>% 
-  filter_at(vars(contains("effect")), all_vars(str_detect(., "milk"))) %>% 
+purrr::map_dfr(.x = c("D", "SE", "AP", "FM", "FB", "UMWNE"),
+               ~ corr_iters %>% 
+                 filter_at(vars(contains("val")), all_vars(str_detect(., "milk"))) %>% 
+                 filter(str_detect(val1, .x) & str_detect(val2, "HP"))) %>% 
   mutate(region = glue("{region} (milk)")) %>% 
   group_by(region) %>% 
   summarise(
@@ -138,21 +165,59 @@ corr_iters %>%
   arrange(desc(range_corr))
 ```
 
-```{r, eval=FALSE}
-corr_iters %>% 
-  filter_at(vars(contains("effect")), all_vars(str_detect(., "milk"))) %>% 
-  mutate(region = glue("{region} (milk)")) %>% 
-  select(-contains("effect")) %>% 
-  View()
+## HP MPE & other MPE
+
+```{r}
+purrr::map_dfr(.x = c("D", "SE", "AP", "FM", "FB", "UMWNE"),
+               ~ corr_iters %>% 
+                 filter_at(vars(contains("val")), all_vars(str_detect(., "MPE"))) %>% 
+                 filter(str_detect(val1, .x) & str_detect(val2, "HP"))) %>% 
+  mutate(region = glue("{region} (MPE)")) %>% 
+  mutate(corr = abs(corr)) %>% 
+  group_by(region) %>% 
+  summarise(min_corr = min(corr),
+            mean_corr = mean(corr),
+            max_cor = max(corr),
+            sd_corr = sd(corr),
+            n_iter = n(),
+            range_corr = max(corr)-min(corr)) %>% 
+  arrange(desc(range_corr))
 ```
 
+## HP direct & other maternal
 
-```{r, eval = FALSE}
-corr_iters %>% 
-  filter_at(vars(contains("effect")), all_vars(str_detect(., "direct"))) %>% 
-  mutate(region = glue("{region} (direct)")) %>% 
-  select(-contains("effect")) %>% 
-  View()
+```{r}
+purrr::map_dfr(.x = c("D", "SE", "AP", "FM", "FB", "UMWNE"),
+               ~ corr_iters %>% 
+                 filter(str_detect(val1, "milk"), str_detect(val2, "direct")) %>% 
+                 filter(str_detect(val1, .x) & str_detect(val2, "HP"))) %>% 
+  group_by(region) %>% 
+  summarise(min_corr = min(corr),
+            mean_corr = mean(corr),
+            max_cor = max(corr),
+            sd_corr = sd(corr),
+            n_iter = n(),
+            range_corr = max(corr)-min(corr)) %>% 
+  arrange(desc(range_corr))
+```
+
+## Direct-maternal within region
+
+```{r}
+purrr::map_dfr(.x = c("D", "SE", "HP", "AP", "FM", "FB", "UMWNE"),
+               ~ corr_iters %>% 
+                 filter_at(vars(contains("val")), all_vars(str_detect(., .x))) %>% 
+                 filter(str_detect(val1, "direct") & str_detect(val2, "milk"))) %>% 
+  mutate(region = case_when(str_detect(val1, "HP") & str_detect(val2, "HP") ~ "High Plains",
+                            TRUE ~ region)) %>% 
+  group_by(region) %>% 
+  summarise(min_corr = min(corr),
+            mean_corr = mean(corr),
+            max_cor = max(corr),
+            sd_corr = sd(corr),
+            n_iter = n(),
+            range_corr = max(corr)-min(corr)) %>% 
+  arrange(desc(range_corr))
 ```
 
 
@@ -162,7 +227,7 @@ corr_iters %>%
 
 > Direct
 
-```{r}
+```{r, eval = FALSE}
 bootstrap_h2s %>% 
   mutate(which = if_else(key == "High Plains", "hp", "other")) %>% 
   select(which, h = `Direct h2`, run) %>% 
@@ -182,7 +247,7 @@ bootstrap_h2s %>%
 
 > Maternal
 
-```{r}
+```{r, eval = FALSE}
 bootstrap_h2s %>% 
   mutate(which = if_else(key == "High Plains", "hp", "other")) %>% 
   select(which, h = `Maternal h2`, run) %>% 

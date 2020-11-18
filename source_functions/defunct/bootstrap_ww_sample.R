@@ -9,6 +9,7 @@ library(glue)
 
 source(here::here("source_functions/sample_until.R"))
 source(here::here("source_functions/three_gen.R"))
+source(here::here("source_functions/ped.R"))
 
 region_key <-
   tribble(~num, ~abbrv, ~desc,
@@ -27,12 +28,16 @@ iter <- as.character(commandArgs(trailingOnly = TRUE)[1])
 other_region <- as.character(commandArgs(trailingOnly = TRUE)[2])
 
 ## ------------------------------------------------------------------------
-start <- read_rds(here::here("data/derived_data/bootstrap_ww_start2.rds"))
+#start <- read_rds(here::here("data/derived_data/bootstrap_ww_start2.rds"))
+
+start <- read_rds(here::here("data/derived_data/varcomp_ww/ww_data.rds"))
 
 
 ## ------------------------------------------------------------------------
-ped <- read_rds(here::here("data/derived_data/ped.rds"))
+#ped <- read_rds(here::here("data/derived_data/ped.rds"))
 
+ped <-
+  pull_ped(refresh = FALSE) 
 
 ## ------------------------------------------------------------------------
 ww_zips <-
@@ -46,7 +51,7 @@ ww_zips <-
   group_map(~ sample_until(
     .x,
     limit = 100000,
-    tolerance = 300,
+    tolerance = 500,
     var = zip,
     id_var = unique(.$region)),
     keep = TRUE) %>%
@@ -96,7 +101,7 @@ write_biv_ped <-
     start %>%
       filter(zip %in% ww_zips$zip) %>%
       filter(region %in% c(3, region2)) %>%
-      select(id_new, sire_id, dam_id, birth_year) %>%
+      select(id_new, sire_id, dam_id) %>%
       three_gen(full_ped = ped) %>%
       distinct() %>%
       write_delim(

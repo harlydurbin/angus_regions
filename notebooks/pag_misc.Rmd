@@ -25,7 +25,7 @@ source(here::here("source_functions/region_key.R"))
 # Setup
 
 ```{r}
-cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions_old.rds"))
 ```
 
 
@@ -60,7 +60,6 @@ cg_regions %>%
          dummy_week = as.Date(glue("2019-{birth_week}-1"), "%Y-%U-%u"),
          dummy_week = lubridate::ymd(dummy_week)-6
          ) %>%
-  filter(region %in% c(2, 3, 8)) %>% 
   ggplot(aes(
     x = dummy_week,
     y = percent_born, 
@@ -71,16 +70,29 @@ cg_regions %>%
   scale_y_continuous(labels = scales::percent) +
   scale_x_date(date_labels = "%b %d") +
   scale_color_manual(
-    values = c(
-      "2" = "darkslategray4",
-      "3" = "springgreen3",
-      "8" = "gray17"
-    ),
-    labels = c(
-      "2" = "2: Southeast",
-      "3" = "3: High Plains",
-      "8" = "8: Fescue Belt"
-    )
+       values = c(
+          "1" = "tomato2",
+          "2" = "darkslategray4",
+          "3" = "springgreen3",
+          "4" = "brown",
+          "5" = "goldenrod1",
+          "6" = "gray50",
+          "7" = "deeppink3",
+          "8" = "gray17",
+          "9" = "slateblue2",
+          "All regions" = "red"
+        ),
+        labels = c(
+          "1" = "Desert",
+          "2" = "Southeast",
+          "3" = "High Plains",
+          "4" = "Rainforest",
+          "5" = "Arid Prairie",
+          "6" = "Cold Desert",
+          "7" = "Forested Mountains",
+          "8" = "Fescue Belt",
+          "9" = "UMWNE"
+        )
   ) +
   theme_classic() +
   theme(
@@ -118,14 +130,11 @@ cg_regions %>%
     y = "Percentage born",
     color = NULL,
     linetype = NULL,
-    title = str_wrap(
-      "Calving season distribution by region",
-      width = 55
-    )
+    title = NULL
   ) +
   geom_vline(xintercept = lubridate::ymd("2019-06-30"), color = "red", linetype = "twodash", size = 2) +
   annotate("text", x = lubridate::ymd("2019-06-30"), y = 0, label = "Cut-off for fall & spring calving", size = 6, angle = 90, vjust = -0.7, hjust = -0.2, color = "red")
   
-ggsave(here::here("figures/calving_season_238.png"),width = 12, height = 7)  
+ggsave(here::here("figures/calving_season_all.png"),width = 12, height = 7)  
 ```
 

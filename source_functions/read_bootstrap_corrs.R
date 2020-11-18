@@ -7,19 +7,18 @@ read_bootstrap_corrs <- function(iteration, r1, r2) {
   
   region_key <-
     tibble::tribble(~num, ~abbrv, ~desc,
-            2, "SE", "Southeast",
-            8, "FB", "Fescue Belt",
-            3, "HP", "High Plains", 
-            5, "AP", "Arid Prairie",
-            7, "FM", "Forested Mountains", 
-            1, "D", "Desert",
-            9, "UMWNE", "Upper Midwest & Northeast")
+                    2, "SE", "Southeast",
+                    8, "FB", "Fescue Belt",
+                    3, "HP", "High Plains", 
+                    5, "AP", "Arid Prairie",
+                    7, "FM", "Forested Mountains", 
+                    1, "D", "Desert",
+                    9, "UMWNE", "Upper Midwest & Northeast")
   
   r1_abbrv <-
     region_key %>%
     dplyr::filter(num == r1) %>%
     dplyr::pull(abbrv)
-  
   
   r2_abbrv <-
     region_key %>%
@@ -31,7 +30,6 @@ read_bootstrap_corrs <- function(iteration, r1, r2) {
     dplyr::filter(num == r1) %>%
     dplyr::pull(desc)
   
-  
   r2_desc <-
     region_key %>%
     dplyr::filter(num == r2) %>%
@@ -42,27 +40,40 @@ read_bootstrap_corrs <- function(iteration, r1, r2) {
   
   if (file.exists(here::here(fp))) {
     
-    corrmat <-
-      readr::read_table2(
-        here::here(fp),
-        skip = 9,
-        n_max = 4,
-        col_names = c(glue::glue("{r1_abbrv} (direct)"),
-                      glue::glue("{r2_abbrv} (direct)"),
-                      glue::glue("{r1_abbrv} (milk)"),
-                      glue::glue("{r2_abbrv} (milk)"))) %>% 
-      as.matrix()
-    
-    # Only take the upper diagonal to get rid of duplicates
-    corrmat[lower.tri(corrmat, diag = TRUE)] <- na_dbl
-    
-    corrmat %>%
-      tibble::as.tibble() %>% 
-      dplyr::mutate(effect_1 = colnames(.)) %>%
-      tidyr::pivot_longer(-effect_1,
-                          names_to = "effect_2",
+    gmat <-
+      readr::read_table2(here::here(fp),
+                         skip = 9,
+                         n_max = 4,
+                         col_names = FALSE) %>% 
+      janitor::remove_empty(which = c("rows", "cols")) %>% 
+      purrr::set_names(glue::glue("{r1_abbrv} (direct)"),
+                       glue::glue("{r2_abbrv} (direct)"),
+                       glue::glue("{r1_abbrv} (milk)"),
+                       glue::glue("{r2_abbrv} (milk)")) %>% 
+      mutate(val2 = colnames(.)) %>%
+      tidyr::pivot_longer(cols = -val2,
+                          names_to = "val1",
                           values_to = "corr") %>% 
-      dplyr::filter(!is.na(corr))
+      mutate(iter = glue("{iter}")) 
+    
+    mpemat <-
+      readr::read_table2(here::here(fp),
+                         skip = 24,
+                         n_max = 2,
+                         col_names = FALSE) %>% 
+      janitor::remove_empty(which = c("rows", "cols")) %>%
+      purrr::set_names(glue::glue("{r1_abbrv} (MPE)"),
+                       glue::glue("{r2_abbrv} (MPE)")) %>% 
+      mutate(val2 = colnames(.)) %>%
+      tidyr::pivot_longer(cols = -val2,
+                          names_to = "val1",
+                          values_to = "corr") %>% 
+      mutate(iter = glue("{iter}"))      
+    
+    bothmat <-
+      bind_rows(gmat, mpemat)
+    
+    return(bothmat)
     
   }
 }
