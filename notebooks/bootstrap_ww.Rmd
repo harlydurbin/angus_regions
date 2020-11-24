@@ -101,20 +101,20 @@ bootstrap_h2s %>%
 
 ## $h^2_M$
 
-```{r, eval=FALSE}
+```{r}
 bootstrap_h2s %>% 
   group_by(key) %>% 
   summarise(`Min h2M` = min(`Maternal h2`),
             `Mean h2M` = mean(`Maternal h2`),
-            `Max h2M` = max = max(`Maternal h2`),
+            `Max h2M` = max(`Maternal h2`),
             n = n())
   
 ``` 
 
-## $c^2#
+## $c^2$
 
 
-```{r, eval=FALSE}
+```{r}
 bootstrap_h2s %>% 
   group_by(key) %>% 
   summarise(`Min c2` = min(`MPE c2`),

@@ -228,12 +228,44 @@ mat_qtl_enrich50k <-
   
 ```
 
-# Gene & ontology enrichment results
+# Genes near SNPs
 
 ## Direct
 
 ```{r}
-dir_gene50k
+dir_gene50k %>% 
+  filter(CHR == 7)
+```
+
+### Fescue Belt
+
+* Chromosome 6: known growth QTL
+    + **SLIT2**, **KCNIP4**
+* Chromosome 3: known growth QTL
+    + OR6N1
+    + OR6K6
+    + OR6K3
+    + OR6K2
+        - Implicated in wisent adaptation under selection olfactory, 1:1 ortholog with cattle
+    + SPTA1
+
+```{r}
+dir_gene50k %>% 
+  filter(CHR %in% c(3, 6)) %>% 
+  select(gene_name, region, everything())
+```
+
+### Southeast
+
+* Chromosome 14: known growth QTL
+    + **FBXO32**, WDYHV1, **ATAD2**, 
+* Chromosome 15: 
+    + METTL15
+
+```{r}
+dir_gene50k %>% 
+  filter(CHR %in% c(14, 15)) %>% 
+  select(gene_name, region,everything())
 ```
 
 ## Region 2 maternal
@@ -312,7 +344,6 @@ dir_qtl_enrich50k %>%
   
 ```
 
-
 ```{r}
 dir_qtl50k %>% 
   filter(chr == 20) %>% 
@@ -323,6 +354,20 @@ dir_qtl50k %>%
   group_by(gene_name) %>% 
   tally(sort = TRUE)
 ```
+
+### OR6 genes
+
+```{r}
+dir_qtl_enrich50k %>% 
+  filter(0.05 > adj.pval) %>% 
+  filter(N_QTLs > 1) %>% 
+  left_join(dir_qtl50k %>% 
+              select(QTL = trait_ID, CHR, BP, region)) %>% 
+  left_join(dir_gene50k %>% 
+              select(gene_name, CHR, BP, region)) %>% 
+  filter(str_detect(gene_name, "OR6")) 
+```
+
 
 ## Maternal effect
 
