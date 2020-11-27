@@ -237,6 +237,14 @@ dir_gene50k %>%
   filter(CHR == 7)
 ```
 
+```{r}
+dir_gene50k %>% 
+  filter(CHR == 20) %>% 
+  group_by(gene_name) %>% 
+  tally(sort = TRUE)
+```
+
+
 ### Fescue Belt
 
 * Chromosome 6: known growth QTL
@@ -313,6 +321,14 @@ mat_gene50k %>%
   select(neglog10p, everything())
 
 ```
+
+```{r}
+mat_gene50k %>% 
+  filter(region == 8) %>% 
+  group_by(chr, gene_id, gene_name, gene_biotype) %>% 
+  tally(sort = TRUE)
+```
+
 
 # QTL enrichment results
 
