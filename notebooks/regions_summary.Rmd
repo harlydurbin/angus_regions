@@ -32,10 +32,29 @@ cg_regions <-
   readr::read_rds(here::here("data/derived_data/import_regions/cg_regions.rds"))
 ```
 
+```{r, eval=TRUE}
+cg_regions <- 
+  readr::read_rds(here::here("data/derived_data/cg_regions_old.rds"))
+```
 
 ```{r, eval=TRUE}
 animal_regions <- 
   readr::read_rds(here::here("data/derived_data/import_regions/animal_regions.rds")) 
+```
+
+```{r, eval=TRUE}
+animal_regions <- 
+  readr::read_rds(here::here("data/derived_data/animal_regions_old.rds")) 
+```
+
+```{r}
+animal_regions %<>% 
+  mutate(value = measurements::conv_unit(value, from = "lbs", to = "kg"))
+```
+
+```{r}
+cg_regions %<>% 
+  mutate(value = measurements::conv_unit(value, from = "lbs", to = "kg"))
 ```
 
 # Notes & questions
@@ -106,11 +125,12 @@ plot_samples_map(
   df = cg_regions,
   trait_var = "ww",
   effect_var = "cg_sol",
-  plot_title = "Available Angus weaning weight records"
+  plot_title = NULL
   )
 
-```
+ggsave(filename = here::here("figures/regions_summary/oldmap.png"), width = 8.76, height = 5.4)
 
+```
 
 ## ~~Records per CG~~
 
@@ -219,8 +239,19 @@ ww_sum %>%
 ### Adjusted phenotypes
 
 ```{r ww_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE}
+test <-
+  animal_regions %>%
+  filter(trait == "ww") %>%
+  filter(var == "weight") %>% 
+  group_by(cg_new, region, trait, var) %>% 
+  summarise(value = mean(value)) %>% 
+  ungroup() %>% 
+  sample_n(900)
+```
 
-animal_regions %>%
+```{r ww_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE}
+wwpheno <-
+  animal_regions %>%
   filter(trait == "ww") %>%
   filter(var == "weight") %>% 
   group_by(cg_new, region, trait, var) %>% 
@@ -229,12 +260,19 @@ animal_regions %>%
   solutions_boxswarm(
     effect_var = "weight",
     trait_var = "ww",
-    y_title = "Adjusted weaning weight",
+    y_title = "Adjusted weaning weight (kg)",
     plot_title = NULL
-  )
+  ) +
+  guides(color = FALSE) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank())
+```
 
+
+```{r ww_pheno, fig.width=8.76, fig.height=5.4, echo = FALSE}
 ggsave(
-  here::here("figures/regions_summary/ww_pheno.solutions_boxswarm_postfilter.png"),
+  here::here("figures/regions_summary/ww_pheno.solutions_boxswarm_pld.png"),
   width = 8.76,
   height = 5.4
 )
@@ -299,16 +337,23 @@ cg_regions %>%
  ggsave(here::here("figures/regions_summary/ww_cg.solutions_map_postfilter.png"), width = 8.76, height = 5.4)
 ```
 
-```{r ww_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
-
-cg_regions %>% 
+```{r ww_swarm, fig.width= 10, fig.height=7, echo = FALSE}
+ww_cg <-
+  cg_regions %>% 
   solutions_boxswarm(
   effect_var = "cg_sol",
   trait_var = "ww",
-  y_title = "Weaning weight contemporary group BLUE",
+  y_title = "Weaning weight contemporary\ngroup BLUE (kg)",
   plot_title = NULL
-)
+) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "bottom") 
+```
 
+
+```{r ww_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
 ggsave(here::here("figures/regions_summary/ww_cg.solutions_boxswarm_postfilter.png"), width = 8.76, height = 5.4)
 ```
 
@@ -535,3 +580,15 @@ ggsave(
 We find an `r round(max(ww_sum$median_weight)-min(ww_sum$median_weight), digits = 1)` lb. difference between the median recorded weaning weight in the highest ranked region (`r ww_sum %>% arrange(desc(median_weight)) %>% slice(1) %>% pull(desc)`) and the lowest ranked region (`r ww_sum %>% arrange(median_weight) %>% slice(1) %>% pull(desc)`). Similarly, we find an `r round(max(pwg_sum$median_weight)-min(pwg_sum$median_weight), digits = 1)` lb. difference between the median recorded post-weaning gain in the highest ranked region ((`r pwg_sum %>% arrange(desc(median_weight)) %>% slice(1) %>% pull(desc)`)) and the lowest ranked region (`r pwg_sum %>% arrange(median_weight) %>% slice(1) %>% pull(desc)`).  
 
 However, compared to weaning weight which appears to be normally distributed *[do I need to actually test this]*, the distribution of post-weaning gain measurements appears to be bimodal regardless of region. This likely reflects increased variation in management post-weaning.
+
+```{r, fig.width=8, fig.height=14}
+library(patchwork)
+
+wwpheno/ww_cg + plot_annotation(tag_levels = c("a")) & 
+  theme(plot.tag = element_text(size = 24))
+```
+
+```{r}
+ggsave(here::here("figures/regions_summary/panel.png"), width = 10, height = 12)
+```
+

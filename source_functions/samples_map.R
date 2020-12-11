@@ -36,15 +36,15 @@ plot_samples_map <-
           "9" = "slateblue2"
         ),
         labels = c(
-          "1" = "1: Desert",
-          "2" = "2: Southeast",
-          "3" = "3: High Plains",
-          "4" = "4: Rainforest",
-          "5" = "5: Arid Prairie",
-          "6" = "6: Cold Desert",
-          "7" = "7: Forested Mountains",
-          "8" = "8: Fescue Belt",
-          "9" = "9: Upper Midwest & Northeast"
+          "1" = "Desert",
+          "2" = "Southeast",
+          "3" = "High Plains",
+          "4" = "Rainforest",
+          "5" = "Arid Prairie",
+          "6" = "Cold Desert",
+          "7" = "Forested Mountains",
+          "8" = "Fescue Belt",
+          "9" = "Upper Midwest & Northeast"
         )
       ) +
       ggplot2::scale_x_continuous(expand = c(0, 0)) +

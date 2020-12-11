@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/defunct/bivariate_bootstrap.snakefile --keep-going --rerun-incomplete --latency-wait 90 --resources load=200 -j 24 --config &> log/snakemake_log/bivariate_bootstrap/201115.bivariate_bootstrap.log &
+# nohup snakemake -s source_functions/defunct/bivariate_bootstrap.snakefile --keep-going --rerun-incomplete --latency-wait 90 --resources load=200 -j 24 --config --until initialize &> log/snakemake_log/bivariate_bootstrap/201118.bivariate_bootstrap.log &
 
 configfile: "source_functions/config/bivariate_bootstrap.config.yaml"
 
@@ -29,7 +29,8 @@ rule initialize:
     resources:
         load = 1
     input:
-        in_par = "data/derived_data/bootstrap_ww/bootstrap_ww.par"
+        in_par = "data/derived_data/bootstrap_ww/bootstrap_ww.par",
+        datafile = "data/derived_data/bootstrap_ww/3v{region}/iter{iter}/data.txt",
     output:
         out_par = "data/derived_data/bootstrap_ww/3v{region}/iter{iter}/bootstrap_ww.par"
     shell:

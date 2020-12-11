@@ -37,7 +37,7 @@ start <- read_rds(here::here("data/derived_data/varcomp_ww/ww_data.rds"))
 #ped <- read_rds(here::here("data/derived_data/ped.rds"))
 
 ped <-
-  pull_ped(refresh = FALSE) 
+  pull_ped(refresh = FALSE)
 
 ## ------------------------------------------------------------------------
 ww_zips <-
@@ -51,7 +51,7 @@ ww_zips <-
   group_map(~ sample_until(
     .x,
     limit = 100000,
-    tolerance = 500,
+    tolerance = 1000,
     var = zip,
     id_var = unique(.$region)),
     keep = TRUE) %>%

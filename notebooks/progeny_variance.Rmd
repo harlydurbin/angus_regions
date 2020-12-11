@@ -33,20 +33,33 @@ options(scipen=999)
 
 # Setup
 
+```{r}
+ped <- read_rds(here::here("data/derived_data/import_regions/ped.rds"))
+```
+
 * Create subset of `animal_regions`
 
-```{r}
+```{r, eval = FALSE}
 calves_start <-
   readr::read_rds(here::here("data/derived_data/import_regions/animal_regions.rds")) %>% 
   filter(trait == "ww" & var == "weight")
 ```
+
+```{r}
+calves_start <-
+  readr::read_rds(here::here("data/derived_data/animal_regions_old.rds")) %>% 
+  filter(trait == "ww" & var == "weight") %>% 
+  mutate(value = measurements::conv_unit(value, from = "lbs", to = "kg")) %>% 
+  left_join(ped %>% 
+              select(id_new, sire_id, dam_id, full_reg))
+```
+
 
 * Using `calves_start`, summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
 * Remove region/sire combinations with only one unique contemporary group
 * Remove region/sire combinations with fewer than 50 calves
 
 ```{r}
-
 sire_tally <- 
   calves_start %>% 
   group_by(sire_id, region) %>% 
@@ -64,9 +77,7 @@ sire_tally <-
   # Discard rows where sire has fewer than 50 calves in the region
   filter(n >= 50) 
   
-  
 ```
-
 
 * For each sire, compare each retained region with each other retained region (with swap duplicates)
 
@@ -138,11 +149,11 @@ sire_pair %>%
 
 # Comparing against baseline
 
-How many sires with region where calves are at least 50 pounds lighter than the overall average weight of their calves?
+How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves?
 
 ```{r}
 baseline_change %>% 
-  filter(change < -50) %>% 
+  filter(change < -20) %>% 
   n_distinct(.[["sire_id"]]) %>% 
   scales::comma()
 
@@ -153,7 +164,7 @@ Which regions most often fall far below sire baseline?
 ```{r}
 
 baseline_change %>% 
-  filter(change < -50) %>% 
+  filter(change < -20) %>% 
   group_by(V1) %>% 
   tally() %>% 
   rename(Region = V1) %>% 
@@ -161,9 +172,16 @@ baseline_change %>%
 
 ```
 
+```{r}
+baseline_change %>% 
+  summarise(max(median_v1),
+            max(median_overall),
+            min(median_v1),
+            min(median_overall))
+```
 
-```{r, fig.width=13, fig.height=9}
 
+```{r, fig.width=12, fig.height=12}
 baseline_change  %>% 
   left_join(
     region_key %>% 
@@ -179,8 +197,8 @@ baseline_change  %>%
   geom_point(aes(color = change),
             # size = 5,
              alpha = 0.6) +
-  lims(x = c(425, 750),
-       y = c(425, 750)) +
+  lims(x = c(155, 355),
+       y = c(155, 355)) +
   geom_abline(slope = 1,
               linetype = "twodash",
               #size = 3
@@ -218,19 +236,23 @@ baseline_change  %>%
     axis.text = element_text(size = 18),
     strip.text = element_text(size = 16)
   ) +
-  facet_wrap(~desc) +
+  facet_wrap(~desc, nrow = 3) +
   labs(
-    x = "Median weaning weight of sire's calves in all regions",
-    y = glue("Median weaning weight of sire's\ncalves in comparison region"),
-    title = "Many AI sires perform inconsistently across regions",
+    x = "Median weaning weight of sire's\ncalves in all regions",
+    y = glue("Median weaning weight of sire's calves in comparison region"),
+    #title = "Many AI sires perform inconsistently across regions",
+    title = NULL,
     color = "Change",
     fill = "Count"
   )
+```
 
+
+```{r, fig.width=13, fig.height=9}
 ggsave(
-  here::here("figures/progeny_variance/ww.sire_var.medianvall_point.post_filter.png"),
-  width = 13,
-  height = 9
+  here::here("figures/progeny_variance/ww.sire_var.medianvall_point.old.png"),
+  width = 6,
+  height = 20
 )
 
 ```
@@ -258,7 +280,8 @@ baseline_change %>%
   group_by(sire_id) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   ungroup() %>% 
-  filter(spread >= 120.8989)
+  filter(spread >= 20.86525+(15.17347*3))
+  #filter(spread >= 120.8989)
 ```
 
 
@@ -312,8 +335,57 @@ baseline_change %>%
 
 # Compare sire performance in High Plains against performance in every other region
 
-```{r, fig.width=13, fig.height=8}
+```{r}
+sire_pair %>% 
+  filter(V2 == 3) %>% 
+  distinct(sire_id)
 
+```
+
+* Recreate `baseline_change` using High Plains as the "baseline"
+
+```{r}
+
+hp_change <-
+  sire_pair %>% 
+  filter(V1 ==3)
+```
+
+How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves?
+
+```{r}
+hp_change %>% 
+  filter(change > 20) %>% 
+  n_distinct(.[["sire_id"]]) %>% 
+  scales::comma()
+
+```
+
+Which regions most often fall far below sire baseline?
+
+```{r}
+
+hp_change %>% 
+  filter(change > 20) %>% 
+  group_by(V2) %>% 
+  tally() %>% 
+  rename(Region = V2) %>% 
+  arrange(desc(n))
+
+```
+
+```{r}
+hp_change %>% 
+  summarise(max(median_v1),
+            max(median_overall),
+            min(median_v1),
+            min(median_overall))
+```
+
+
+---
+
+```{r, fig.width=13, fig.height=8}
 sire_pair %>% 
   filter(V1 == 3) %>% 
   left_join(
@@ -337,8 +409,8 @@ sire_pair %>%
   geom_point(aes(color = change),
              size = 3,
              alpha = 0.75) +
-  lims(x = c(425, 750),
-       y = c(425, 750)) +
+  lims(x = c(155, 355),
+       y = c(155, 355)) +
   viridis::scale_color_viridis(option = "magma", direction = -1, end = 0.8) +
   geom_abline(slope = 1,
               linetype = "twodash",
@@ -374,19 +446,24 @@ sire_pair %>%
       l = 0
     )),
     axis.text = element_text(size = 18),
-    strip.text = element_text(size = 16)
+    strip.text = element_text(size = 16),
+    panel.spacing.x=unit(2, "lines")
   ) +
   facet_wrap(~desc_v2) +
   labs(
-    y = glue("Median weaning weight of calves \n in comparison region"),
-    x = glue("Median weaning weight of calves \n in High Plains"),
-    title = "Many AI sires perform inconsistently across regions",
+    y = glue("Median weaning weight of calves \n in comparison region (kg)"),
+    x = glue("Median weaning weight of calves \n in High Plains (kg)"),
+    #title = "Many AI sires perform inconsistently across regions",
+    title = NULL,
     color = "Change"
   )
+```
 
+
+```{r, fig.width=13, fig.height=8}
 ggsave(
-  here::here("figures/progeny_variance/ww.sire_var.3vall_point.postfilter.png"),
-  width = 12,
+  here::here("figures/progeny_variance/ww.sire_var.3vall_point.old.png"),
+  width = 13,
   height = 8
 )
 ```

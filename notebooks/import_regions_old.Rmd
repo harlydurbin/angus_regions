@@ -57,7 +57,6 @@ source(here::here("source_functions/ped.R"))
 ped <- pull_ped(refresh = FALSE)
 ```
 
-
 # Subset solutions file
 
 
@@ -239,15 +238,6 @@ growth_zip <-
   tidylog::filter(herd_state == abb) %>% 
   select(-abb)
 
-write_rds(growth_zip, here::here("data/derived_data/growth_zip.rds"))
-
-```
-
-```{r}
-animal_regions %>% 
-  distinct(var)
-
-min(animal_regions$year)
 ```
 
 
@@ -255,19 +245,19 @@ min(animal_regions$year)
 
 * Check for multiple region assignments
 
-```{r}
+```{r, eval=FALSE}
 growth_zip %>% 
   group_by(trait, zip) %>% 
   filter(n_distinct(region) > 1)
 ```
 
-```{r}
+```{r, eval = FALSE}
 growth_zip %>% 
   filter(is.na(region))
 
 ```
 
-```{r}
+```{r, evale = FALSE}
 growth_zip %>% 
   filter(is.na(lat))
 ```
@@ -296,7 +286,7 @@ renf90 <-
 
 * Contemporary group "continuity": contemporary groups can only be "subset"/split across life stages. How many contemporary groups have data for more than one trait?
 
-```{r}
+```{r, eval = FALSE}
 
 renf90 %>% 
   group_by(cg_old) %>% 
@@ -310,7 +300,7 @@ renf90 %>%
 * Do any CGs have multiple "new" names?
     + I.e., resulting from splitting a CG
 
-```{r}
+```{r, eval = FALSE}
 
 renf90 %>% 
   group_by(cg_old) %>% 
@@ -371,7 +361,7 @@ animal_solutions <-
 
 
 ```{r export animal_solutions, echo = TRUE}
-write_rds(animal_solutions, here::here("data/derived_data/animal_solutions.rds"))
+write_rds(animal_solutions, here::here("data/derived_data/animal_solutions_old.rds"))
 
 ```
 
@@ -481,12 +471,6 @@ cg_solutions <-
 
 ## Joined
 
-```{r}
-cg_regions %>% 
-  filter(is.na(n_animals))
-```
-
-
 ```{r cg_regions}
 
 cg_regions <-
@@ -515,25 +499,17 @@ cg_regions <-
   )
 ```
 
-```{r}
-cg_regions %>% 
-  distinct(trait)
-
-cg_regions %>% 
-  filter(is.na(n_animals))
-```
-
 
 # Export
 
 
 ```{r export animal_regions}
-readr::write_rds(animal_regions, here::here("data/derived_data/animal_regions.rds"))
+readr::write_rds(animal_regions, here::here("data/derived_data/animal_regions_old.rds"))
 ```
 
 
 ```{r export cg_regions}
-readr::write_rds(cg_regions, here::here("data/derived_data/cg_regions.rds"))
+readr::write_rds(cg_regions, here::here("data/derived_data/cg_regions_old.rds"))
 ```
 
 
@@ -565,6 +541,50 @@ cg_regions %>%
 
 ```
 
+----
 
+```{r}
+animal_regions_full <-
+  read_rds(here::here("data/derived_data/import_regions/animal_regions_full.rds")) %>% 
+  filter(year >= 1990) %>% 
+  filter(trait == "ww") %>% 
+  filter(!region %in% c(4, 6)) %>% 
+  filter(n_animals >= 5)
+```
 
+```{r}
 
+cg_regions_full <-
+  read_rds(here::here("data/derived_data/import_regions/cg_regions_full.rds")) %>% 
+  select(-n_animals) %>% 
+  right_join(
+    animal_regions_full %>% 
+      select(trait, cg_new, n_animals) %>% 
+      distinct()
+  )
+```
+
+```{r}
+animal_regions_full %>%
+  filter(var == "weight") %>% 
+  summarise(mean =  measurements::conv_unit(mean(value), from = "lbs", to = "kg"),
+            sd =  measurements::conv_unit(sd(value), from = "lbs", to = "kg"), 
+            n = n())
+```
+
+```{r}
+cg_regions_full %>% 
+  group_by(region) %>% 
+  summarise(records = sum(n_animals),
+            cgs = n())
+```
+
+```{r}
+animal_regions_full %>% 
+  write_rds(here::here("data/derived_data/animal_regions_old.rds"))
+```
+
+```{r}
+cg_regions_full %>% 
+  write_rds(here::here("data/derived_data/cg_regions_old.rds"))
+```
