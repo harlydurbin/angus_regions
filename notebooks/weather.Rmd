@@ -1,0 +1,404 @@
+---
+title: "Weather year-to-year"
+author: "Harly Durbin"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    df_print: paged
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(tidylog)
+library(grid)
+library(gganimate)
+
+source(here::here("source_functions/solutions_map.R"))
+source(here::here("source_functions/solutions_line.R"))
+source(here::here("source_functions/solutions_var_line.R"))
+
+```
+
+```{r}
+cg_regions <- read_rds(here::here("data/derived_data/cg_regions.rds"))
+animal_regions <- read_rds(here::here("data/derived_data/animal_regions.rds"))
+prism_zip <- read_rds(here::here("data/derived_data/prism_zip.rds"))
+```
+
+# Year-to-year {.tabset}
+
+* Do stressful years result in a higher variance in CG solutions? I.e., more likely some producers will change management to compensate
+    + Doesn't appear so
+
+## Weaning weight
+
+```{r, fig.width=10, fig.height=12, eval = FALSE}
+
+cg_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_var_line(
+    effect_var = "cg_sol", 
+    trait_var = "ww",
+    plot_title = "The variance of weaning weight CG solutions changes little across regions or time", 
+    y_lab 
+    national_avg = TRUE
+  )
+
+#ggsave(here::here("figures/ww_cg.solutions_variance.png"), width = 10, height = 12)
+```
+
+## Post-weaning gain
+
+```{r, fig.width=10, fig.height=12, eval=FALSE}
+
+cg_regions %>%
+  filter(!region %in% c(4, 6)) %>%
+  solutions_var_line(
+    effect_var = "cg_sol", 
+    trait_var = "pwg",
+    plot_title = "The variance of post-weaning gain CG solutions changes little across regions or time"
+  )
+
+#ggsave(here::here("figures/pwg_cg.solutions_variance.png"), width = 10, height = 12)
+```
+
+
+# Contemporary group solutions "over & under" the mean by year {.tabset}
+
+* Does  need to be on a national/year basis? Or on a "overall mean for the region" basis (I.e., "is this year different than what's normal for my region)?
+* Also maybe: plot only 1 +/- standard deviation? Take out points around the mean?
+
+## Weaning weight
+
+### Against regional mean
+
+```{r, fig.width=10, fig.height=5.4, eval = FALSE}
+p1 <-
+  cg_regions %>% 
+  filter(!region %in% c(4, 6)) %>%
+  filter(trait == "ww" & var == "cg_sol") %>%
+  filter(n_animals > 4) %>% 
+  mutate(yr = lubridate::year(weigh_date),
+         yr = as.integer(yr)) %>%
+  group_by(region) %>% 
+  mutate(comp = mean(value)) %>% 
+  ungroup() %>% 
+  group_by(zip, yr) %>% 
+  mutate(sz = sum(n_animals),
+         zip_sol = mean(value)) %>% 
+  ungroup() %>% 
+  mutate(
+         overunder = 
+           case_when(
+             zip_sol > comp ~ "Above mean",
+             zip_sol < comp ~ "Below mean"
+           ),
+         howmuch = zip_sol - comp,
+         howmuch = abs(howmuch)
+           ) %>% 
+  select(trait, var, yr, region, comp, zip, sz, overunder, howmuch, lng, lat) %>% 
+  distinct() %>% 
+  filter(howmuch < 300) %>% 
+  solutions_map(
+    effect_var = "cg_sol",
+    trait_var = "ww",
+    plot_title = "test",
+    color_var = howmuch,
+    size_var = sz,
+    size_range = c(1, 4)
+      ) +
+  facet_wrap(~ overunder) +
+  theme(legend.position = "bottom",
+        strip.text.x = element_text(size = 16)) +
+  gganimate::transition_time(yr) +
+  labs(title = "Weaning weigh CG solutions: {frame_time}")
+```
+
+
+```{r, fig.width=10, fig.height=5.4, eval = FALSE}
+
+anim_save(filename = here::here("figures/ww_overunder_byregion.gif"), animation = plot, nframes = 48, fps = 1)
+
+  
+```
+
+![](../figures/ww_overunder_byregion.gif)
+
+
+
+### Against national/yearly mean
+
+```{r, fig.width=10, fig.height=5.4, eval = FALSE}
+p2 <- 
+  cg_regions %>% 
+  filter(!region %in% c(4, 6)) %>%
+  filter(trait == "ww" & var == "cg_sol") %>%
+  mutate(yr = lubridate::year(weigh_date),
+         yr = as.integer(yr)) %>%
+  group_by(yr) %>% 
+  mutate(comp = mean(solution)) %>% 
+  ungroup() %>% 
+  group_by(zip, yr) %>% 
+  mutate(sz = sum(n_animals),
+         zip_sol = mean(solution)) %>% 
+  ungroup() %>% 
+  mutate(
+         overunder = 
+           case_when(
+             zip_sol > comp ~ "Above mean",
+             zip_sol < comp ~ "Below mean"
+           ),
+         howmuch = zip_sol - comp,
+         howmuch = abs(howmuch)
+           ) %>% 
+  select(trait, var, yr, region, comp, zip, sz, overunder, howmuch, lng, lat) %>% 
+  distinct() %>% 
+  filter(howmuch < 300) %>% 
+  solutions_map(
+    effect_var = "cg_sol",
+    trait_var = "ww",
+    plot_title = "test",
+    color_var = howmuch,
+    size_var = sz,
+    size_range = c(1, 4)
+    ) +
+  facet_wrap(~ overunder) +
+  theme(legend.position = "bottom",
+        strip.text.x = element_text(size = 16)) +
+  gganimate::transition_time(yr) +
+  labs(title = "Weaning weigh CG solutions: {frame_time}")
+```
+
+
+```{r}
+
+#anim_save(filename = here::here("figures/ww_overunder_byyear.gif"), animation = plot_byyear, nframes = 48, fps = 1)
+```
+
+![](../figures/ww_overunder_byyear.gif)
+
+
+# Weather
+
+* I think yearly temp and rainfall might not actually be as straightforward as I thought originally
+    + I.e., a higher yearly temp could also mean a warm winter --> higher forage availability 
+        - See also: not taking into account differences in calving season across trends
+    + Maybe eventually pull [USDA drought data](https://www.drought.gov/drought/drought-data-download-and-services)?
+
+```{r, fig.width=10, fig.height=5.4, eval=FALSE}
+
+cg_regions %>%
+  filter(var == "cg_sol" & trait == "ww") %>%
+  mutate(year = lubridate::year(weigh_date)) %>%
+  left_join(prism_zip %>%
+              select(-lat,-lng) %>% 
+              mutate(year = year - 1)) %>%
+  group_by(year) %>%
+  mutate(
+    yr_sol = mean(value),
+    yr_temp = mean(tmean),
+    yr_rain = mean(ppt),
+    sd_sol = sd(value),
+    sd_temp = sd(tmean),
+    sd_rain = sd(ppt),   
+  ) %>%
+  ungroup() %>%
+  filter(region %in% c(1, 2, 5)) %>% 
+  group_by(region, year) %>%
+  summarise(
+    dev_sol = (mean(value) - unique(yr_sol))/unique(sd_sol),
+    dev_temp = (mean(tmean) - unique(yr_temp))/unique(sd_temp),
+    dev_rain = (mean(ppt) - unique(yr_rain))/unique(sd_rain)
+  ) %>%
+  ungroup() %>%
+  reshape2::melt(id = c("region", "year")) %>% 
+  ggplot(
+    aes(
+      x = year,
+      y = value,
+      linetype = variable,
+      color = forcats::as_factor(region)
+    )
+  ) +
+  geom_line(size = 1.25) +
+  scale_linetype_manual(
+    values = c(
+      "dev_sol" = "solid",
+      "dev_temp" = "dotted",
+      "dev_rain" = "twodash"
+      ),
+    labels = c(
+      "dev_sol" = "CG solution",
+      "dev_temp" = "Temperature",
+      "dev_rain" = "Rain"
+      )
+    ) +
+  scale_color_manual(
+    values = c(
+      "1" = "tomato2",
+      "2" = "darkslategray4",
+      "3" = "springgreen3",
+      "4" = "brown",
+      "5" = "goldenrod1",
+      "6" = "gray50",
+      "7" = "deeppink3",
+      "8" = "gray17",
+      "9" = "slateblue2"
+    ),
+    labels = c(
+      "1" = "1: Desert",
+      "2" = "2: Southeast",
+      "3" = "3: High Plains",
+      "4" = "4: Rainforest",
+      "5" = "5: Arid Prairie",
+      "6" = "6: Cold Desert",
+      "7" = "7: Forested Mountains",
+      "8" = "8: Fescue Belt",
+      "9" = "9: Upper Midwest & Northeast"
+    )
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      size = 22,
+      face = "italic",
+      margin = margin(
+        t = 0,
+        r = 0,
+        b = 13,
+        l = 0
+      )
+    ),
+    axis.title = element_text(
+      size = 16),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(
+      size = 14),
+    legend.text = element_text(
+      size = 14)
+  ) +
+  labs(x = NULL,
+       y = "Standardized value",
+       color = NULL,
+       linetype = NULL,
+       title = str_wrap("Environmental variables are not directly related to weaning weight CG solutions", width = 55)
+       ) +
+  facet_wrap(~ region, 
+             nrow = 3) 
+  
+```
+
+
+```{r, fig.width=7, fig.height=8, eval=FALSE}
+cg_regions %>%
+  filter(var == "cg_sol" & trait == "ww") %>%
+  mutate(year = lubridate::year(weigh_date),
+         ) %>%
+  left_join(prism_zip %>%
+              select(-lat, -lng) %>%
+              mutate(year = year - 1)) %>%
+  group_by(region, desc, year) %>%
+  summarise(
+    yr_sol = mean(value),
+    yr_temp = mean(tmean),
+    yr_rain = mean(ppt),
+    sd_sol = sd(value),
+    sd_temp = sd(tmean),
+    sd_rain = sd(ppt),
+  ) %>% 
+  filter(region %in% c(1, 2, 5)) %>% 
+  ungroup() %>% 
+  mutate(
+    desc = str_remove(desc, "\\([[:alpha:]]+\\)")
+  ) %>% 
+  ggplot(aes(
+    y = yr_temp,
+    x = yr_sol,
+    color = forcats::as_factor(region))) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+    scale_color_manual(
+    values = c(
+      "1" = "tomato2",
+      "2" = "darkslategray4",
+      "3" = "springgreen3",
+      "4" = "brown",
+      "5" = "goldenrod1",
+      "6" = "gray50",
+      "7" = "deeppink3",
+      "8" = "gray17",
+      "9" = "slateblue2"
+    ),
+    labels = c(
+      "1" = "1: Desert",
+      "2" = "2: Southeast",
+      "3" = "3: High Plains",
+      "4" = "4: Rainforest",
+      "5" = "5: Arid Prairie",
+      "6" = "6: Cold Desert",
+      "7" = "7: Forested Mountains",
+      "8" = "8: Fescue Belt",
+      "9" = "9: Upper Midwest & Northeast"
+    )
+  ) +
+  theme_classic() +
+  facet_wrap(~ desc, 
+             nrow = 3,
+             scales = "free_y") +
+    theme(
+    plot.title = element_text(
+      size = 22,
+      face = "italic",
+      margin = margin(
+        t = 0,
+        r = 0,
+        b = 13,
+        l = 0
+      )
+    ),
+    axis.title = element_text(
+      size = 16),
+    axis.title.y = element_text(margin = margin(
+      t = 0,
+      r = 13,
+      b = 0,
+      l = 0
+    )),
+    axis.title.x = element_text(margin = margin(
+      t = 13,
+      r = 0,
+      b = 0,
+      l = 0
+    )),
+    axis.text = element_text(
+      size = 16),
+    legend.text = element_text(
+      size = 14),
+    strip.text.x = element_text(size = 14)
+  ) +
+  labs(x = "Mean CG solution for the year",
+       color = NULL,
+       y = "Mean temperature for the year",
+       title = str_wrap("Mean annual temperature is not directly related to mean annual weaning weight CG solution",
+                        width = 38))
+  
+```
+
