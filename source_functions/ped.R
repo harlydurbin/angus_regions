@@ -7,7 +7,7 @@ pull_ped <-
   function(refresh = FALSE) {
     if (refresh == TRUE) {
 
-        read_table2(here::here("data/raw_data/renadd02.ped"),
+        read_table2(here::here("data/raw_data/import_regions/renadd02.ped"),
                     col_names = FALSE) %>%
         rename(id_new = X1,
                sire_id = X2,
@@ -21,7 +21,7 @@ pull_ped <-
         mutate(full_reg = as.character(glue::glue("{reg_type}{registration_number}"))) %>%
         # Key of embryo transfer animals
         left_join(
-          read_csv(here::here("data/raw_data/Growth_ET.csv")) %>%
+          read_csv(here::here("data/raw_data/import_regions/Growth_ET.csv")) %>%
             mutate(
               registration_number = str_extract(REG_NUM, "[[:digit:]]+"),
               reg_type = str_extract(REG_NUM, "[[:upper:]]+"),
@@ -34,7 +34,7 @@ pull_ped <-
         ) %>%
         # Key of birth years
         left_join(
-          read_csv(here::here("data/raw_data/Growth_BirthYr.csv")) %>%
+          read_csv(here::here("data/raw_data/import_regions/Growth_BirthYr.csv")) %>%
             mutate(
               registration_number = str_extract(REG_NUM, "[[:digit:]]+"),
               reg_type = str_extract(REG_NUM, "[[:upper:]]+"),

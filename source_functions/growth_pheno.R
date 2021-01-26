@@ -1,7 +1,7 @@
 # Import growth phenotypes
 
 growth_pheno <-
-  readr::read_table2(here::here("data/raw_data/renf90.dat"),
+  readr::read_table2(here::here("data/raw_data/import_regions/renf90.dat"),
                      col_names = FALSE) %>%
   # X7 is a unique identifier?
   # What is X8??
@@ -33,5 +33,3 @@ growth_pheno <-
   select(-(bw:pwg_cg)) %>%
   filter(!is.na(trait)) %>%
   filter(cg_new != 0)
-
-#readr::write_rds(growth_pheno, here::here("data/derived_data/growth_pheno.rds"))
