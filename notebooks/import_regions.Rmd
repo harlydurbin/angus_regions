@@ -21,6 +21,7 @@ library(ggplot2)
 library(rlang)
 library(tidylog)
 library(magrittr)
+library(glue)
 library(tidylog)
 
 source(here::here("source_functions/slice_cg_new.R"))
@@ -53,12 +54,18 @@ source(here::here("source_functions/growth_pheno.R"))
 ```
 
 ```{r}
+growth_pheno %<>%
+  filter(trait == "ww")
+```
+
+```{r}
 ped <- pull_ped(refresh = FALSE)
 ```
 
 # Subset solutions file
 
 ```
+awk '{if ($1 == 1 && $2 == 2) {print}}' data/raw_data/solutions > data/raw_data/bw_animal.txt
 awk '{if ($1 == 2 && $2 != 1 && $2 != 4) {print}}' data/raw_data/solutions > data/raw_data/ww_animal.txt
 awk '{if ($1 == 3 && $2 == 2) {print}}' data/raw_data/solutions > data/raw_data/pwg_animal.txt
 ```
@@ -94,10 +101,10 @@ region_key <-
   # Updated to new key 12/10 after realizing old key excluded ~2,000 zips
   # 33,099 rows
   left_join(read_csv(here::here("data/raw_data/import_regions/uszips.csv")) %>% 
-      select(lat,
-             lng,
-             zip,
-             abb = state_id)) %>%
+              select(lat,
+                     lng,
+                     zip,
+                     abb = state_id)) %>%
   # Add region descriptions
   mutate(desc = case_when(region == 1 ~ "Desert (orange)",
                           region == 2 ~ "Southeast (teal)",
@@ -165,10 +172,23 @@ growth_zip <-
   # For now, drop
   tidylog::filter(!is.na(region)) %>% 
   # For now, drop if herd state doesn't match zip code state
-  # filter: removed 9646 out of 952890 rows (1%)
   tidylog::filter(herd_state == abb) %>% 
   select(-abb)
 
+```
+
+```{r}
+growth_zip %>% 
+  group_by(zip) %>% 
+  filter(n_distinct(region) > 1)
+```
+
+# Key of region orgins (regardless of if WW record available)
+
+```{r}
+read_table2(here::here("data/raw_data/import_regions/Birth_CG_ZIP.txt"),
+            skip = 1,
+            col_names = c("cg_old", "zip_raw", "herd_state"))
 ```
 
 # RenF90 table {.tabset}
@@ -227,30 +247,38 @@ renf90 %>%
     + 3 == Maternal
     + 4 == Permanent environment
 
+## Import raw solutions
+
+* Import weaning weight direct and maternal EBVs
+* Reshape from long to wide
+* Attach adjusted weaning weights from `growth_pheno`
+* Remove rows with no recorded weaning weight
+
 ```{r animal_solutions, echo = TRUE}
 animal_solutions <-
   read_table2(here::here("data/raw_data/import_regions/ww_animal.txt"),
               col_names = c("trait", "effect", "id_new", "solution")) %>%
   mutate(effect = case_when(effect == 2 ~ "bv_sol",
-                            effect == 3 ~ "mat_sol")) %>%
-  # Only WW, don't need trait
-  select(-trait) %>% 
+                            effect == 3 ~ "mat_sol"),
+         trait = "ww") %>%
   tidyr::pivot_wider(names_from = effect,
                      values_from = solution) %>%
   # Join by trait and id_new
   # cols: id_new, bv_sol, mat_sol, weight, cg_new
-  left_join(growth_pheno %>% 
-              filter(trait == "ww")) %>% 
+  left_join(growth_pheno) %>% 
+  # Remove if no weight recorded
   filter(!is.na(weight)) %>% 
+  # Columns: id_new, cg_new, trait, bv_sol, mat_sol, weight
   select(id_new, cg_new, everything())
 ```
 
 ## Join
 
+* Use `slice_cg_new` function to match up renamed CG IDs to the original CG IDs in `growth_zip`
+* Append geographic information found in `growth_zip` to `animal_solutions` (joining by `cg_new` found in previous step)
+
 ```{r animal_regions}
 animal_regions <-
-  # Before joining animal solutions,
-  # cols: trait, cg_old, zip_raw, herd_state, weigh_date, zip, region, lat, lng, desc, n_animals, cg_new
   growth_zip %>%
   # Purpose: match up old CG name to blupf90 renamed CG
   # Slice second occurence because ww is trait 2
@@ -258,19 +286,22 @@ animal_regions <-
   # Purpose: add solutions from BLUPF90 output, add new IDs
   # join by cg_new, trait
   left_join(animal_solutions) %>%
-  # Purpose: add et status & real registration number
+  # Purpose: add et status, real registration number, sire and dam registration numbers 
   left_join(ped %>%
-              select(id_new, full_reg, et_status)) %>%
+              select(id_new, full_reg, sire_reg, dam_reg, et_status)) %>%
   mutate(year = lubridate::year(weigh_date))
 ```
 
-## Filter
+## Filter and QC
 
+* Remove region 8 but no fescue
+* Remove ET calves
 * Remove records pre-1990
 * Remove region 4, region 6
 * Remove contemporary groups with fewer than 5 animals
-* Keep only contemporary groups without phenotypic outliers (where an outlier is 3 SD above or below national mean)
+* Remove if unknown parentage
 * Remove single sire and single dam contemporary groups
+* Convert `weight`, `bv_sol`, `mat_sol` from lbs to kg
 
 ```{r animal_regions}
 animal_regions %<>%
@@ -298,6 +329,8 @@ animal_regions %<>%
   filter(year >= 1990) %>% 
   # Remove region 4, 6
   filter(!region %in% c(4, 6)) %>%
+  # Remove if unknown parentage
+  filter_at(vars("sire_reg", "dam_reg"), all_vars(. != "0")) %>% 
   # Remove single sire, single dam CG groups
   left_join(ped %>% 
               select(full_reg, sire_id, dam_id)) %>% 
@@ -314,7 +347,7 @@ animal_regions %<>%
 
 ```
 
-### List of contemporary groups containing phenotypic outliers
+> List of contemporary groups containing phenotypic outliers after filtering
 
 ```{r}
 outlier_cg <-
@@ -331,65 +364,118 @@ outlier_cg <-
   
 ```
 
-### Remove contemporary groups containing phenotypic outliers
+* Remove contemporary groups containing phenotypic outliers
 
 ```{r}
 animal_regions %<>%
-  anti_join(outlier_cg)
+  # filter: removed 344,375 rows (6%), 5,233,035 rows remaining
+  filter(!cg_new %in% outlier_cg$cg_new) %>% 
+  select(id_new, full_reg, sire_reg, dam_reg, cg_new, n_animals, region, desc, herd_state, zip, lat, lng, weigh_date, year, weight, bv_sol, mat_sol)
 ```
 
 ## Export
 
 ```{r}
 animal_regions %>% 
-  select(id_new, full_reg, sire_reg, dam_reg, cg_new, n_animals, region, desc, herd_state, zip, lat, lng, year, weigh_date, weight, bv_sol, mat_sol) %>% 
-write_rds(here::here("data/derived_data/import_regions/animal_regions.rds"))
+  write_rds(here::here("data/derived_data/import_regions/animal_regions.rds"))
 ```
 
 # Contemporary group solutions
+
+## Import raw solutions
 
 ```{r cg_solutions}
 cg_solutions <-
   read_table2(here::here("data/raw_data/cg_sol.txt"),
               col_names = c("trait", "effect", "cg_new", "solution")) %>%
-  # don't need birth weight
+  # don't need birth weight or pwg
   filter(trait == 2) %>% 
   mutate(trait = "ww") %>% 
-  # don't need effect, they're all cg_sol
-  # don't need trait, they're all ww
   select(-effect)
 ```
 
-## Joined
+## Join
+
+* Keep on contemporary groups in post-filtering `animal_regions`
+* Convert `cg_sol` from lbs to kg
 
 ```{r cg_regions}
 cg_regions <-
-  growth_zip %>% 
-  # Before joining cg solutions,
-  # cols: trait, cg_old, zip_raw, herd_state, weigh_date, zip, region, lat, lng, desc, n_animals, cg_new
-  # Slice second occurence because ww is trait 2
-  slice_cg_new(trait_var = "ww", trait_order = 2) %>% 
-  left_join(cg_solutions)
-```
-
-
-```{r cg_regions}
-%>% 
-  mutate(year = lubridate::year(weigh_date),
-         var = "cg_sol") %>% 
-  select(trait, var, value = solution, weigh_date, year, cg_old, cg_new, region, desc, herd_state, zip, lat, lng) %>% 
-  right_join(n_animals_full)
+  animal_regions %>% 
+  distinct(cg_new, n_animals, region, desc, herd_state, zip, lat, lng, weigh_date, year) %>% 
+  left_join(cg_solutions %>% 
+              select(cg_new, cg_sol = solution)) %>% 
+  mutate(cg_sol = measurements::conv_unit(cg_sol, from = "lbs", to = "kg"))
 ```
 
 ## Export
 
 ```{r}
 cg_regions %>% 
-  right_join(animal_regions %>% 
-               select(trait, cg_new) %>% 
-               distinct()) %>% 
   write_rds(here::here("data/derived_data/import_regions/cg_regions.rds"))
 
 ```
 
+# Key of region orgins (regardless of if WW record available)
+
+```{r}
+
+reg_region <-
+  purrr::pmap_dfr(list(x = c("Birth", "Wean", "Year"),
+                       y = c("bw", "ww", "pwg"),
+                       z = c(1, 2, 3),
+                       # CG column 
+                       cg = list("X4", "X5", "X6")),
+            .f = function(x, y, z, cg) {
+              
+              # File of zip codes corresponding to trait CGs prior to re-naming
+              read_table2(here::here(glue("data/raw_data/import_regions/{x}_CG_ZIP.txt")),
+                          skip = 1,
+                          col_names = c("cg_old", "zip_raw", "herd_state")) %>% 
+                # Foreign zips, drop
+                filter(!str_detect(zip_raw, "[[:alpha:]]")) %>% 
+                # Strip down to five digit zip code
+                # DON'T convert from character to numeric: removes leading zeros
+                mutate(zip = case_when(str_detect(zip_raw, "[[:punct:]]") ~ str_extract(zip_raw, "^[[:digit:]]{5}"),
+                                       TRUE ~ zip_raw),
+                       trait = y) %>% 
+                # Append region data
+                left_join(region_key) %>% 
+                # Append re-named CG
+                slice_cg_new(trait_var = y,
+                             trait_order = z) %>% 
+                # Append re-named animal IDs by matching to re-named CG
+                left_join(readr::read_table2(here::here("data/raw_data/import_regions/renf90.dat"),
+                                             col_names = FALSE) %>%
+                            select(cg_new := !!rlang::sym(cg), id_new = X7) %>% 
+                            filter(cg_new != "0")) %>% 
+                left_join(ped %>% 
+                            select(id_new, full_reg)) %>% 
+                select(full_reg, region, desc, herd_state, zip, lat, lng)
+            }) %>% 
+  distinct(full_reg, region, desc, herd_state, zip, lat, lng)
+
+```
+
+```{r}
+reg_region %>% 
+  write_rds(here::here("data/derived_data/import_regions/reg_region.rds"))
+```
+
+
 # Commentary
+
+```{r}
+animal_regions %>% 
+  group_by(region) %>% 
+  summarise(n = n(),
+            n_cg = n_distinct(cg_new))
+```
+
+```{r}
+cg_regions %>% 
+  group_by(region) %>% 
+  summarise(n = sum(n_animals),
+            n_cg = n())
+```
+

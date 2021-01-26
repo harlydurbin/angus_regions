@@ -37,40 +37,25 @@ options(scipen=999)
 ped <- read_rds(here::here("data/derived_data/import_regions/ped.rds"))
 ```
 
-* Create subset of `animal_regions`
-
-```{r, eval = FALSE}
-calves_start <-
-  readr::read_rds(here::here("data/derived_data/import_regions/animal_regions.rds")) %>% 
-  filter(trait == "ww" & var == "weight")
-```
-
 ```{r}
-calves_start <-
-  readr::read_rds(here::here("data/derived_data/animal_regions_old.rds")) %>% 
-  filter(trait == "ww" & var == "weight") %>% 
-  mutate(value = measurements::conv_unit(value, from = "lbs", to = "kg")) %>% 
-  left_join(ped %>% 
-              select(id_new, sire_id, dam_id, full_reg))
+animal_regions <-
+  readr::read_rds(here::here("data/derived_data/import_regions/animal_regions.rds"))
 ```
 
-
-* Using `calves_start`, summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
+* Summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
 * Remove region/sire combinations with only one unique contemporary group
 * Remove region/sire combinations with fewer than 50 calves
 
 ```{r}
 sire_tally <- 
-  calves_start %>% 
-  group_by(sire_id, region) %>% 
+  animal_regions %>% 
+  group_by(sire_reg, region) %>% 
   # For each sire/region combination, 
   # summarize number of calves, number of CGs, mean WW
-  summarise(
-    n = n(),
-    n_cg = n_distinct(cg_new),
-    mean_ww = mean(value), 
-    median_ww = median(value)
-  ) %>% 
+  summarise(n = n(),
+            n_cg = n_distinct(cg_new),
+            mean_ww = mean(weight), 
+            median_ww = median(weight)) %>% 
   ungroup() %>% 
   # Discard rows where sire has only one CG in the region
   filter(n_cg > 1) %>% 
@@ -89,62 +74,59 @@ sire_pair <-
   filter(V1 != V2) %>% 
   # Add column of median weight for first region
   left_join(sire_tally %>%
-              select(sire_id,
+              select(sire_reg,
                      region,
-                     median_v1 = median_ww
-                     ),
+                     median_v1 = median_ww),
             by = c("V1" = "region")) %>%
   # Add column of median weight for second region
-  left_join(
-    sire_tally %>%
-      select(sire_id,
-             region,
-             median_v2 = median_ww
-             ),
-    by = c("V2" = "region", "sire_id" = "sire_id")
-  ) %>% 
-  select(sire_id, everything()) %>% 
-  # Retain only rows with mean_weight in both comparison regions
+  left_join(sire_tally %>%
+              select(sire_reg,
+                     region,
+                     median_v2 = median_ww),
+            by = c("V2" = "region", "sire_reg" = "sire_reg")) %>% 
+  select(sire_reg, everything()) %>% 
+  # Retain only rows with median_weight in both comparison regions
   filter_at(vars(contains("median")), all_vars(!is.na(.))) %>%
   # Calculate the difference between medians
   mutate(change = median_v1 - median_v2) 
 
 ```
 
-```{r}
-sire_pair %>% 
-  select(sire_id, V1, V2) %>% 
-  tidyr::pivot_longer(cols = c("V1", "V2")) %>% 
-  select(-name) %>% 
-  distinct() %>% 
-  group_by(sire_id) %>% 
-  summarise(n_regions = n_distinct(value)) %>% 
-  ungroup() %>% 
-  arrange(desc(n_regions)) %>% 
-  group_by(n_regions) %>% 
-  summarise(n_sires = n_distinct(sire_id)) %>% 
-  ungroup() %>% 
-  mutate(percent = n_sires/sum(n_sires))
-```
-
-
-* For each sire, compare the median of calves in selected region against mean of all calves retained in `calves_start`
+* For each sire, compare the median of his calves in selected region against mean of all his calves retained
 
 ```{r}
 
 baseline_change <-
-sire_pair %>% 
-  select(sire_id, V1, median_v1) %>% 
+  sire_pair %>% 
+  select(sire_reg, V1, median_v1) %>% 
   distinct() %>% 
-  left_join(
-    calves_start %>% 
-      group_by(sire_id) %>% 
-      summarise(median_overall = median(value)) %>% 
-      ungroup()
-  ) %>% 
+  left_join(animal_regions %>% 
+              group_by(sire_reg) %>% 
+              summarise(median_overall = median(weight)) %>% 
+              ungroup()) %>% 
   mutate(change = median_v1 - median_overall)
 
   
+```
+
+# Basic data summary
+
+* Number of regions passing criteria per sire. What percentage of sires have 2-7 regions?
+
+```{r}
+sire_pair %>% 
+  select(sire_reg, V1, V2) %>% 
+  tidyr::pivot_longer(cols = c("V1", "V2")) %>% 
+  select(-name) %>% 
+  distinct() %>% 
+  group_by(sire_reg) %>% 
+  summarise(n_regions = n_distinct(value)) %>% 
+  ungroup() %>% 
+  arrange(desc(n_regions)) %>% 
+  group_by(n_regions) %>% 
+  summarise(n_sires = n_distinct(sire_reg)) %>% 
+  ungroup() %>% 
+  mutate(percent = n_sires/sum(n_sires))
 ```
 
 # Comparing against baseline
@@ -154,7 +136,7 @@ How many sires with region where calves are at least 20 kg lighter than the over
 ```{r}
 baseline_change %>% 
   filter(change < -20) %>% 
-  n_distinct(.[["sire_id"]]) %>% 
+  n_distinct(.[["sire_reg"]]) %>% 
   scales::comma()
 
 ```
@@ -180,114 +162,79 @@ baseline_change %>%
             min(median_overall))
 ```
 
-
 ```{r, fig.width=12, fig.height=12}
 baseline_change  %>% 
-  left_join(
-    region_key %>% 
-      select(
-        V1 = num, 
-        desc
-      )
-  ) %>%
+  left_join(region_key %>% 
+              select(V1 = num, 
+                     desc)) %>%
   ggplot(aes(x = median_overall,
-             y = median_v1,
-             #size = n_total)
-         )) +
+             y = median_v1)) +
   geom_point(aes(color = change),
-            # size = 5,
              alpha = 0.6) +
   lims(x = c(155, 355),
        y = c(155, 355)) +
   geom_abline(slope = 1,
-              linetype = "twodash",
-              #size = 3
-              ) +
+              linetype = "twodash") +
   viridis::scale_color_viridis(direction = 1) +
   theme_classic() +
-  theme(
-    plot.title = element_text(
-      size = 28,
-      face = "italic"),
-    plot.subtitle = element_text(
-      size = 20,
-      margin = margin(
-        t = 0,
-        r = 0,
-        b = 13,
-        l = 0
-      )
-    ),
+  theme(plot.title = element_text(size = 28,
+                                  face = "italic"),
+    plot.subtitle = element_text(size = 20,
+                                 margin = margin(t = 0,
+                                                 r = 0,
+                                                 b = 13,
+                                                 l = 0)),
     legend.title = element_text(size = 16),
     legend.text = element_text(size = 14),
     axis.title = element_text(size = 22),
-    axis.title.y = element_text(margin = margin(
-      t = 0,
-      r = 13,
-      b = 0,
-      l = 0
-    )),
-    axis.title.x = element_text(margin = margin(
-      t = 13,
-      r = 0,
-      b = 0,
-      l = 0
-    )),
+    axis.title.y = element_text(margin = margin(t = 0,
+                                                r = 13,
+                                                b = 0,
+                                                l = 0)),
+    axis.title.x = element_text(margin = margin(t = 13,
+                                                r = 0,
+                                                b = 0,
+                                                l = 0)),
     axis.text = element_text(size = 18),
-    strip.text = element_text(size = 16)
-  ) +
+    strip.text = element_text(size = 16)) +
   facet_wrap(~desc, nrow = 3) +
-  labs(
-    x = "Median weaning weight of sire's\ncalves in all regions",
-    y = glue("Median weaning weight of sire's calves in comparison region"),
-    #title = "Many AI sires perform inconsistently across regions",
-    title = NULL,
-    color = "Change",
-    fill = "Count"
-  )
+  labs(x = "Median weaning weight of sire's\ncalves in all regions",
+       y = "Median weaning weight of sire's calves in comparison region",
+       title = NULL,
+       color = "Change",
+       fill = "Count")
 ```
-
-
-```{r, fig.width=13, fig.height=9}
-ggsave(
-  here::here("figures/progeny_variance/ww.sire_var.medianvall_point.old.png"),
-  width = 6,
-  height = 20
-)
-
-```
-
 
 # Inter-region spread
 
-What is the distribution of across-region spread? 
+* What is the distribution of across-region spread? 
 
 ```{r}
 baseline_change %>% 
-  group_by(sire_id) %>% 
+  group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   ungroup() %>% 
-  summarise(
-    median_spread = median(spread),
-    min_spread = min(spread),
-    max_spread = max(spread),
-    sd_spread = sd(spread)
-    )
+  summarise(median_spread = median(spread),
+            min_spread = min(spread),
+            max_spread = max(spread),
+            sd_spread = sd(spread))
 ```
 
+* How many sires with spread greater than 3 SD above the median?
+
 ```{r}
 baseline_change %>% 
-  group_by(sire_id) %>% 
+  group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   ungroup() %>% 
-  filter(spread >= 20.86525+(15.17347*3))
-  #filter(spread >= 120.8989)
+  filter(spread >= 18.1437+(12.30019*3)) %>% 
+  arrange(desc(spread))
 ```
 
 
 ```{r, fig.width=12, fig.height=8}
 baseline_change %>% 
-  group_by(sire_id) %>% 
+  group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   arrange(desc(spread)) %>% 
   ggplot(aes(x = spread)) +
@@ -326,7 +273,7 @@ baseline_change %>%
 ```{r}
 
 baseline_change %>% 
-  group_by(sire_id) %>% 
+  group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   arrange(desc(spread))
 
@@ -338,7 +285,7 @@ baseline_change %>%
 ```{r}
 sire_pair %>% 
   filter(V2 == 3) %>% 
-  distinct(sire_id)
+  distinct(sire_reg)
 
 ```
 
@@ -356,7 +303,7 @@ How many sires with region where calves are at least 20 kg lighter than the over
 ```{r}
 hp_change %>% 
   filter(change > 20) %>% 
-  n_distinct(.[["sire_id"]]) %>% 
+  n_distinct(.[["sire_reg"]]) %>% 
   scales::comma()
 
 ```
@@ -475,8 +422,8 @@ Among beef cattle producers, it is common knowlege that some AI sires vary in pe
 * For AI sires with calves born in multiple regions, how much does the median weight of their calves vary from region to region? 
 * Is the difference in mean weight of calves consistent between sires or are some sires less "robust", showing more variability across regions?
 
-Sires with at least 50 calves and at least two unique contemporary groups in two or more regions were retained for analysis (n = `r scales::comma(length(unique(baseline_change$sire_id)))`).
+Sires with at least 50 calves and at least two unique contemporary groups in two or more regions were retained for analysis (n = `r scales::comma(length(unique(baseline_change$sire_reg)))`).
 
-Of sires with at least 50 calves in multiple regions,`r baseline_change %>% filter(change < -50) %>% summarise(n_distinct(sire_id)) %>% pull(1) %>% scales::comma()` had at least one region in which the median weaning weight of calves in that region was at least 50 pounds lower than the median weaning weight of their calves across all regions. Most often this region was the Fescue Belt, occurring > 60% more often than the second ranked region (the Southeast). The median inter-region spread of weaning weights was about 45 pounds, though 5 sires had an inter-region spread greater than or equal to 200 lbs. 
+Of sires with at least 50 calves in multiple regions,`r baseline_change %>% filter(change < -50) %>% summarise(n_distinct(sire_reg)) %>% pull(1) %>% scales::comma()` had at least one region in which the median weaning weight of calves in that region was at least 50 pounds lower than the median weaning weight of their calves across all regions. Most often this region was the Fescue Belt, occurring > 60% more often than the second ranked region (the Southeast). The median inter-region spread of weaning weights was about 45 pounds, though 5 sires had an inter-region spread greater than or equal to 200 lbs. 
 
 

@@ -6,7 +6,8 @@
 pull_ped <-
   function(refresh = FALSE) {
     if (refresh == TRUE) {
-
+      
+      ped <-
         read_table2(here::here("data/raw_data/import_regions/renadd02.ped"),
                     col_names = FALSE) %>%
         rename(id_new = X1,
@@ -48,6 +49,14 @@ pull_ped <-
         slice(1) %>%
         ungroup()
 
+      ped %<>%
+        # Append sire_reg
+        left_join(ped %>% 
+                    select(sire_id = id_new, sire_reg = full_reg)) %>% 
+        # Append dam_reg
+        left_join(ped %>% 
+                    select(dam_id = id_new, dam_reg = full_reg))
+      
     }
 
     else {
