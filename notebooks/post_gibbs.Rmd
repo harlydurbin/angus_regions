@@ -38,7 +38,7 @@ Sampling parameters:
 * 200,000 samples
 * Keep every 20th sample after 10,000 sample burn-in
 
-# Monte Carlo error by time series {.tabset}
+# Monte Carlo error by time series 
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_mce <-
@@ -54,7 +54,6 @@ gibbs_mce <-
 ```{r, echo=FALSE}
 DT::datatable(gibbs_mce, rownames = FALSE)
 ```
-
 
 # Posterior standard deviation
 

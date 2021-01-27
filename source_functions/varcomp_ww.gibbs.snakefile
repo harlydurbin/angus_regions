@@ -3,10 +3,10 @@
 import os
 
 # Make log directories if they don't exist
-os.makedirs("/home/agiintern/regions/log/rule_log/varcomp_ww", exist_ok = True)
-os.makedirs("/home/agiintern/regions/log/rule_log/varcomp_ww/sample", exist_ok = True)
+os.makedirs("/home/agiintern/regions/log/rule_log/gibbs_varcomp", exist_ok = True)
+os.makedirs("/home/agiintern/regions/log/rule_log/gibbs_varcomp/sample", exist_ok = True)
 
-configfile: "source_functions/config/varcomp_ww.gibbs.config.yaml"
+configfile: "source_functions/config/gibbs_varcomp.config.yaml"
 
 rule all:
     input:
