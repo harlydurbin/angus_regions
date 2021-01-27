@@ -38,6 +38,10 @@ ped <- read_rds(here::here("data/derived_data/import_regions/ped.rds"))
 ```
 
 ```{r}
+
+```
+
+```{r}
 animal_regions <-
   readr::read_rds(here::here("data/derived_data/import_regions/animal_regions.rds"))
 ```
