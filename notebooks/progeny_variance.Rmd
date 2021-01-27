@@ -4,7 +4,7 @@ author: "Harly Durbin"
 output:
   html_document:
     toc: true
-    toc_depth: 3
+    toc_depth: 2
     df_print: paged
     code_folding: hide 
 ---
@@ -14,14 +14,10 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(readr)
 library(dplyr)
 library(tidyr)
-library(stringr)
-library(rlang)
 library(glue)
 library(ggplot2)
-library(lubridate)
 library(forcats)
 library(magrittr)
-library(purrr)
 library(tidylog)
 
 source(here::here("source_functions/region_key.R"))
@@ -34,23 +30,20 @@ options(scipen=999)
 # Setup
 
 ```{r}
-ped <- read_rds(here::here("data/derived_data/import_regions/ped.rds"))
-```
-
-```{r}
-
-```
-
-```{r}
 animal_regions <-
   readr::read_rds(here::here("data/derived_data/import_regions/animal_regions.rds"))
+```
+
+```{r, eval = FALSE}
+reg_region <-
+  readr::read_rds(here::here("data/derived_data/import_regions/reg_region.rds"))
 ```
 
 * Summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
 * Remove region/sire combinations with only one unique contemporary group
 * Remove region/sire combinations with fewer than 50 calves
 
-```{r}
+```{r sire_tally}
 sire_tally <- 
   animal_regions %>% 
   group_by(sire_reg, region) %>% 
@@ -70,7 +63,7 @@ sire_tally <-
 
 * For each sire, compare each retained region with each other retained region (with swap duplicates)
 
-```{r}
+```{r sire_pair}
 
 sire_pair <-
   arrangements::permutations(x = c(1:9), k = 2) %>% 
@@ -98,7 +91,7 @@ sire_pair <-
 
 * For each sire, compare the median of his calves in selected region against mean of all his calves retained
 
-```{r}
+```{r baseline_change}
 
 baseline_change <-
   sire_pair %>% 
@@ -117,7 +110,7 @@ baseline_change <-
 
 * Number of regions passing criteria per sire. What percentage of sires have 2-7 regions?
 
-```{r}
+```{r pct_per_region}
 sire_pair %>% 
   select(sire_reg, V1, V2) %>% 
   tidyr::pivot_longer(cols = c("V1", "V2")) %>% 
@@ -133,7 +126,7 @@ sire_pair %>%
   mutate(percent = n_sires/sum(n_sires))
 ```
 
-# Comparing against baseline
+# Comparing sire performance against its own baseline
 
 How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves?
 
@@ -181,26 +174,19 @@ baseline_change  %>%
               linetype = "twodash") +
   viridis::scale_color_viridis(direction = 1) +
   theme_classic() +
-  theme(plot.title = element_text(size = 28,
-                                  face = "italic"),
-    plot.subtitle = element_text(size = 20,
-                                 margin = margin(t = 0,
-                                                 r = 0,
-                                                 b = 13,
-                                                 l = 0)),
-    legend.title = element_text(size = 16),
-    legend.text = element_text(size = 14),
-    axis.title = element_text(size = 22),
-    axis.title.y = element_text(margin = margin(t = 0,
-                                                r = 13,
-                                                b = 0,
-                                                l = 0)),
-    axis.title.x = element_text(margin = margin(t = 13,
-                                                r = 0,
-                                                b = 0,
-                                                l = 0)),
-    axis.text = element_text(size = 18),
-    strip.text = element_text(size = 16)) +
+  theme(legend.title = element_text(size = 16),
+        legend.text = element_text(size = 14),
+        axis.title = element_text(size = 22),
+        axis.title.y = element_text(margin = margin(t = 0,
+                                                    r = 13,
+                                                    b = 0,
+                                                    l = 0)),
+        axis.title.x = element_text(margin = margin(t = 13,
+                                                    r = 0,
+                                                    b = 0,
+                                                    l = 0)),
+        axis.text = element_text(size = 18),
+        strip.text = element_text(size = 16)) +
   facet_wrap(~desc, nrow = 3) +
   labs(x = "Median weaning weight of sire's\ncalves in all regions",
        y = "Median weaning weight of sire's calves in comparison region",
@@ -231,10 +217,9 @@ baseline_change %>%
   group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   ungroup() %>% 
-  filter(spread >= 18.1437+(12.30019*3)) %>% 
+  filter(spread >= 17.9169+(10.89403*3)) %>% 
   arrange(desc(spread))
 ```
-
 
 ```{r, fig.width=12, fig.height=8}
 baseline_change %>% 
@@ -243,48 +228,48 @@ baseline_change %>%
   arrange(desc(spread)) %>% 
   ggplot(aes(x = spread)) +
   geom_histogram(bins = 25) +  theme_classic() +
-  theme(
-    plot.title = element_text(
-      size = 28,
-      face = "italic"),
-    axis.title = element_text(size = 22),
-    axis.title.y = element_text(margin = margin(
-      t = 0,
-      r = 13,
-      b = 0,
-      l = 0
-    )),
-    axis.title.x = element_text(margin = margin(
-      t = 13,
-      r = 0,
-      b = 0,
-      l = 0
-    )),
-    axis.text = element_text(size = 18),
-  ) +
+  theme(axis.title = element_text(size = 22),
+        axis.title.y = element_text(margin = margin(t = 0,
+                                                    r = 13,
+                                                    b = 0,
+                                                    l = 0)),
+        axis.title.x = element_text(margin = margin(t = 13,
+                                                    r = 0,
+                                                    b = 0,
+                                                    l = 0)),
+        axis.text = element_text(size = 18)) +
   geom_vline(aes(xintercept = median(spread))) +
   scale_x_continuous(breaks = seq(from = 0, to = 300, by = 25)) +
-  labs(
-    x = "Inter-region spread",
-    y = "Count",
-    title = "The median inter-region spead of\nweaning weights for AI sires is ~ 40 lbs"
-  )
+  labs(x = "Inter-region spread",
+       y = "Count",
+       title = NULL)
     
 
 ```
 
+```{r, eval=FALSE}
 
-```{r}
-
-baseline_change %>% 
+test <-
+  baseline_change %>% 
   group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
-  arrange(desc(spread))
+  arrange(desc(spread)) %>% 
+  left_join(reg_region %>% 
+              select(region, sire_reg = full_reg))
 
 ```
 
+```{r, eval=FALSE}
+test %>% 
+  rename(home_region = region) %>% 
+  ggplot(aes(x = spread)) +
+  geom_histogram() +
+  facet_wrap(~ home_region)
+```
 
 # Compare sire performance in High Plains against performance in every other region
+
+* How many sires pass criteria in the HP?
 
 ```{r}
 sire_pair %>% 
@@ -299,10 +284,10 @@ sire_pair %>%
 
 hp_change <-
   sire_pair %>% 
-  filter(V1 ==3)
+  filter(V1 == 3)
 ```
 
-How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves?
+* How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves in the High Plains?
 
 ```{r}
 hp_change %>% 
@@ -312,7 +297,7 @@ hp_change %>%
 
 ```
 
-Which regions most often fall far below sire baseline?
+* Which regions most often fall far below the High Plains baseline?
 
 ```{r}
 
@@ -325,38 +310,17 @@ hp_change %>%
 
 ```
 
-```{r}
-hp_change %>% 
-  summarise(max(median_v1),
-            max(median_overall),
-            min(median_v1),
-            min(median_overall))
-```
-
-
----
-
 ```{r, fig.width=13, fig.height=8}
 sire_pair %>% 
   filter(V1 == 3) %>% 
-  left_join(
-    region_key %>% 
-      select(
-        V1 = num, 
-        desc_v1 = desc
-      )
-  ) %>% 
-  left_join(
-    region_key %>% 
-      select(
-        V2 = num, 
-        desc_v2 = desc
-      )
-  ) %>%
+  left_join(region_key %>% 
+              select(V1 = num, 
+                     desc_v1 = desc)) %>% 
+  left_join(region_key %>% 
+              select(V2 = num, 
+                     desc_v2 = desc)) %>%
   ggplot(aes(x = median_v1,
-             y = median_v2,
-             #size = n_total)
-         )) +
+             y = median_v2)) +
   geom_point(aes(color = change),
              size = 3,
              alpha = 0.75) +
@@ -364,70 +328,33 @@ sire_pair %>%
        y = c(155, 355)) +
   viridis::scale_color_viridis(option = "magma", direction = -1, end = 0.8) +
   geom_abline(slope = 1,
-              linetype = "twodash",
-              #size = 3
-              ) +
+              linetype = "twodash") +
   theme_classic() +
-  theme(
-    plot.title = element_text(
-      size = 28,
-      face = "italic"),
-    plot.subtitle = element_text(
-      size = 20,
-      margin = margin(
-        t = 0,
-        r = 0,
-        b = 13,
-        l = 0
-      )
-    ),
-    legend.title = element_text(size = 16),
-    legend.text = element_text(size = 14),
-    axis.title = element_text(size = 22),
-    axis.title.y = element_text(margin = margin(
-      t = 0,
-      r = 13,
-      b = 0,
-      l = 0
-    )),
-    axis.title.x = element_text(margin = margin(
-      t = 13,
-      r = 0,
-      b = 0,
-      l = 0
-    )),
-    axis.text = element_text(size = 18),
-    strip.text = element_text(size = 16),
-    panel.spacing.x=unit(2, "lines")
-  ) +
+  theme(legend.title = element_text(size = 16),
+        legend.text = element_text(size = 14),
+        axis.title = element_text(size = 22),
+        axis.title.y = element_text(margin = margin(t = 0,
+                                                    r = 13,
+                                                    b = 0,
+                                                    l = 0)),
+        axis.title.x = element_text(margin = margin(t = 13,
+                                                    r = 0,
+                                                    b = 0,
+                                                    l = 0)),
+        axis.text = element_text(size = 18),
+        strip.text = element_text(size = 16),
+        panel.spacing.x = unit(2, "lines")) +
   facet_wrap(~desc_v2) +
-  labs(
-    y = glue("Median weaning weight of calves \n in comparison region (kg)"),
-    x = glue("Median weaning weight of calves \n in High Plains (kg)"),
-    #title = "Many AI sires perform inconsistently across regions",
-    title = NULL,
-    color = "Change"
-  )
+  labs(y = glue("Median weaning weight of calves \n in comparison region (kg)"),
+       x = glue("Median weaning weight of calves \n in High Plains (kg)"),
+       title = NULL,
+       color = "Change")
 ```
-
 
 ```{r, fig.width=13, fig.height=8}
 ggsave(
-  here::here("figures/progeny_variance/ww.sire_var.3vall_point.old.png"),
+  here::here("figures/progeny_variance/ww.sire_var.3vall_point.png"),
   width = 13,
   height = 8
 )
 ```
-
-# Commentary
-
-Among beef cattle producers, it is common knowlege that some AI sires vary in performance across regions. However, this variation is often only anecdotal. Therefore, we asked:
-
-* For AI sires with calves born in multiple regions, how much does the median weight of their calves vary from region to region? 
-* Is the difference in mean weight of calves consistent between sires or are some sires less "robust", showing more variability across regions?
-
-Sires with at least 50 calves and at least two unique contemporary groups in two or more regions were retained for analysis (n = `r scales::comma(length(unique(baseline_change$sire_reg)))`).
-
-Of sires with at least 50 calves in multiple regions,`r baseline_change %>% filter(change < -50) %>% summarise(n_distinct(sire_reg)) %>% pull(1) %>% scales::comma()` had at least one region in which the median weaning weight of calves in that region was at least 50 pounds lower than the median weaning weight of their calves across all regions. Most often this region was the Fescue Belt, occurring > 60% more often than the second ranked region (the Southeast). The median inter-region spread of weaning weights was about 45 pounds, though 5 sires had an inter-region spread greater than or equal to 200 lbs. 
-
-
