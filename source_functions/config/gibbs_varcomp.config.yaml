@@ -8,16 +8,14 @@ post_gibbs_path: '/usr/local/bin/postgibbsf90'
 
 iter: ['1', '2', '3', '4', '5']
 
-sample_limit = "50000"
+sample_limit: "50000"
 
 dataset: ['3v1', '3v2', '3v5', '3v7', '3v8', '3v9']
 
-rounds: "200000"
+rounds: "500000"
 
 burnin: "0"
 
 thin: "20"
 
-post_gibbs_burnin: "10000"
-
-continue_rounds: "200000"
+post_gibbs_burnin: "0"

@@ -40,6 +40,30 @@ dir.create(here::here(glue::glue("data/derived_data/gibbs_varcomp/iter{iter}")))
 c("3v1", "3v2", "3v5", "3v7", "3v8", "3v9") %>% 
   purrr::map(~ dir.create(here::here(glue::glue("data/derived_data/gibbs_varcomp/iter{iter}/{.x}"))))
 
+# List of dams with records in region 3 and another region
+
+multi_dam <-
+  animal_regions %>% 
+  group_by(dam_reg, region) %>% 
+  tally() %>% 
+   ungroup() %>% 
+  group_by(dam_reg) %>% 
+  filter(n_distinct(region) > 1) %>% 
+  ungroup() %>% 
+  tidyr::pivot_wider(id_cols = dam_reg,
+                     names_from = region,
+                     values_from = n) %>% 
+  filter(!is.na(`3`)) %>% 
+  pull(dam_reg)
+
+# Exclude their calves to get around MPE covariance issues
+
+animal_regions %<>% 
+  filter(!dam_reg %in% multi_dam) %>%
+  # Re-filter for contemporary group size
+  group_by(cg_new) %>% 
+  filter(n() >= 5) %>% 
+  ungroup()
 
 ## -----------------------------------------------------------------------------
 keep_zips <-

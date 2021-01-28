@@ -31,6 +31,12 @@ rule sample:
     shell:
         "Rscript --vanilla {input.script} {params.iter} {params.sample_limit} &> {params.rule_log}"
 
+rule copy_par:
+    input:
+        par = "source_functions/par/gibbs_varcomp.par",
+    output:
+        par = "source_functio"
+
 rule renf90:
     resources:
         load = 20
