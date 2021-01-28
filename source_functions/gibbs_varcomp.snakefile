@@ -10,18 +10,7 @@ configfile: "source_functions/config/gibbs_varcomp.config.yaml"
 
 rule all:
     input:
-     expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/{file}", iter = config['iter'], dataset = config['dataset'], file = ["postout", "postmean"])
-
-# Format map file for BLUPF90
-rule format_map:
-    input:
-        master_map = config['master_map']
-    output:
-        format_map = "data/derived_data/chrinfo.50k.txt"
-    shell:
-        """
-        awk '{{print $5, $2, $3, $4}}' {input.master_map} &> {output.format_map}
-        """
+     expand("data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/{file}", iter = config['iter'], dataset = config['dataset'], file = ["postout", "postmean"])
 
 # Create sample datasets
 rule sample:
@@ -33,7 +22,7 @@ rule sample:
         fun_ped = "source_functions/ped.R",
         fun_write_data = "source_functions/write_tworegion_data.R",
         region_key = "source_functions/region_key.R",
-        script = "source_functions/varcomp_ww_start.R",
+        script = "source_functions/setup.gibbs_varcomp.R",
         ww_data = "data/derived_data/varcomp_ww/ww_data.rds",
         ped = "data/derived_data/import_regions/ped.rds"
     params:
@@ -54,9 +43,9 @@ rule copy_data:
         in_data = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/data.txt",
         in_ped = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/ped.txt"
     output:
-        out_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/varcomp_ww.gibbs.par",
-        out_data = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/data.txt",
-        out_ped = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/ped.txt"
+        out_par = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/varcomp_ww.gibbs.par",
+        out_data = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/data.txt",
+        out_ped = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/ped.txt"
     shell:
         """
         cp {input.in_par} {output.out_par}
@@ -68,17 +57,17 @@ rule renf90:
     resources:
         load = 20
     input:
-        in_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/varcomp_ww.gibbs.par",
-        datafile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/data.txt",
-        pedfile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/ped.txt"
+        in_par = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/varcomp_ww.gibbs.par",
+        datafile = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/data.txt",
+        pedfile = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/ped.txt"
     params:
         renumf90_path = config['renumf90_path'],
         directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs",
         in_par = "varcomp_ww.gibbs.par",
         renum_out = "renf90.gibbs.iter{iter}.{dataset}.out"
     output:
-        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/renf90.par",
-        renum_out = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/renf90.gibbs.iter{iter}.{dataset}.out"
+        renum_par = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/renf90.par",
+        renum_out = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/renf90.gibbs.iter{iter}.{dataset}.out"
     shell:
         """
         cd {params.directory}
@@ -89,8 +78,8 @@ rule gibbs:
     resources:
         load = 5
     input:
-        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/renf90.par",
-        renum_out = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/renf90.gibbs.iter{iter}.{dataset}.out"
+        renum_par = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/renf90.par",
+        renum_out = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/renf90.gibbs.iter{iter}.{dataset}.out"
     params:
         gibbs_path = config['gibbs_path'],
         directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs",
@@ -98,10 +87,10 @@ rule gibbs:
         burnin = config['burnin'],
         thin = config['thin'],
         gibbs_out = "gibbs.iter{iter}.{dataset}.out",
-        psrecord = "/home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter{iter}.{dataset}.log"
+        psrecord = "/home/agiintern/regions/log/psrecord/gibbs_varcomp/gibbs.iter{iter}.{dataset}.log"
     output:
-        last_solutions = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/last_solutions"
-    # nohup psrecord "echo -e 'renf90.par \n 200000 10000 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.all.out" --log /home/agiintern/regions/log/psrecord/varcomp_ww/gibbs/gibbs.iter1.all.log --include-children --interval 5 &
+        last_solutions = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/last_solutions"
+    # nohup psrecord "echo -e 'renf90.par \n 200000 10000 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.all.out" --log /home/agiintern/regions/log/psrecord/gibbs_varcomp/gibbs.iter1.all.log --include-children --interval 5 &
     shell:
         """
         cd {params.directory}
@@ -112,12 +101,12 @@ rule post_gibbs:
     resources:
         load = 10
     input:
-        last_solutions = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/last_solutions"
+        last_solutions = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/gibbs/last_solutions"
     params:
         directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs",
     output:
-        postout = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/postout",
-        postmean = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/gibbs/postmean"
+        postout = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/postout",
+        postmean = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/postmean"
     # All integer arguments need to be strings in yaml config file in order to run
     run:
         import pexpect

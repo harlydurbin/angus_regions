@@ -32,3 +32,13 @@ usage_summary(process = "varcomp_ww", keyword = "gibbs")
 ```{r}
 usage_facets(process = "varcomp_ww", keyword = "gibbs")
 ```
+
+# `gibbs2f90`
+
+```{r}
+usage_summary(process = "varcomp_ww", keyword = "gibbs")
+```
+
+```{r}
+usage_facets(process = "varcomp_ww", keyword = "gibbs")
+```

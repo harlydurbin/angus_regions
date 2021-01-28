@@ -6,15 +6,9 @@ gibbs_path: '/usr/local/bin/thrgibbs1f90'
 
 post_gibbs_path: '/usr/local/bin/postgibbsf90'
 
-master_map: 'data/raw_data/angus_map'
-
-master_geno: 'data/raw_data/aaa50snp.dat'
-
 iter: ['1', '2', '3', '4', '5']
 
 dataset: ['3v1', '3v2', '3v5', '3v7', '3v8', '3v9']
-
-dataset_key: {'all':['all'], '3v1':['tworegion'], '3v2':['tworegion'], '3v5':['tworegion'], '3v7':['tworegion'], '3v8':['tworegion'], '3v9':['tworegion']}
 
 rounds: "200000"
 
