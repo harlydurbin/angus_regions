@@ -1,10 +1,13 @@
-# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --keep-going --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=100 -j 36 --config &> log/snakemake_log/gibbs_varcomp/210128.gibbs_varcomp.log &
+# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=100 -j 20 --config &> log/snakemake_log/gibbs_varcomp/210128.gibbs_varcomp.log &
 
 import os
 
 # Make log directories if they don't exist
 os.makedirs("/home/agiintern/angus_regions/log/rule_log/gibbs_varcomp", exist_ok = True)
 os.makedirs("/home/agiintern/angus_regions/log/rule_log/gibbs_varcomp/sample", exist_ok = True)
+
+os.makedirs("/home/agiintern/angus_regions/log/psrecord/gibbs_varcomp", exist_ok = True)
+os.makedirs("/home/agiintern/angus_regions/log/psrecord/gibbs_varcomp/gibbs", exist_ok = True)
 
 configfile: "source_functions/config/gibbs_varcomp.config.yaml"
 
@@ -71,7 +74,7 @@ rule gibbs:
         burnin = config['burnin'],
         thin = config['thin'],
         gibbs_out = "gibbs.iter{iter}.{dataset}.out",
-        psrecord = "/home/agiintern/angus_regions/log/psrecord/gibbs_varcomp/gibbs.iter{iter}.{dataset}.log"
+        psrecord = "/home/agiintern/angus_regions/log/psrecord/gibbs_varcomp/gibbs/gibbs.iter{iter}.{dataset}.log"
     output:
         last_solutions = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/last_solutions",
         # i've been burned too many times

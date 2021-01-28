@@ -87,6 +87,74 @@ ggsave(filename = here::here("figures/regions_summary/sample_map.png"), width = 
 
 ```
 
+# How many dams with calves in more than one region?
+
+```{r}
+multi_dam <-
+  animal_regions %>% 
+  group_by(dam_reg, region) %>% 
+  tally() %>% 
+  ungroup() %>% 
+  group_by(dam_reg) %>% 
+  filter(n_distinct(region) > 1) %>% 
+  ungroup()
+```
+
+```{r}
+multi_dam %>% 
+  group_by(dam_reg) %>% 
+  tally(sort = TRUE,
+        name = "N regions") %>% 
+  rename(`Dam registration number` = dam_reg)
+  
+```
+
+* How many dams with calves in region 3 and another region?
+
+```{r}
+multi_dam %>% 
+  tidyr::pivot_wider(id_cols = dam_reg,
+                     names_from = region,
+                     values_from = n) %>% 
+  filter(!is.na(`3`)) %>% 
+  select(`Dam registration number` = dam_reg)
+```
+
+* What percentage of records come from calves of dams with calves in region 3 + another region?
+
+```{r}
+multi_dam %>% 
+  tidyr::pivot_wider(id_cols = dam_reg,
+                     names_from = region,
+                     values_from = n) %>% 
+  filter(!is.na(`3`)) %>% 
+  select(dam_reg) %>% 
+  left_join(animal_regions) %>% 
+  tally() %>% 
+  mutate(pct = n/length(animal_regions$full_reg))
+```
+
+* How many records get dropped by excluding dams with calves in region 3 + another region then re-filtering for contemporary group?
+
+```{r}
+animal_regions %>% 
+  anti_join(multi_dam %>% 
+              tidyr::pivot_wider(id_cols = dam_reg,
+                                names_from = region,
+                                values_from = n) %>% 
+              filter(!is.na(`3`)) %>% 
+              select(dam_reg),
+            by = "dam_reg") %>% 
+  group_by(cg_new) %>% 
+  filter(n() >= 5) %>% 
+  ungroup() %>% 
+  tally() %>% 
+  mutate(n = length(animal_regions$full_reg)-n,
+         pct = n/length(animal_regions$full_reg))
+  
+
+```
+
 # Region stratification {.tabset}
 
 ```{r, eval = TRUE}
