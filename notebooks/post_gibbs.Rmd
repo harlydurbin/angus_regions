@@ -23,8 +23,15 @@ source(here::here("source_functions/read_gibbs.R"))
 
 # Notes & questions
 
-* MCE: Assuming effect 0 corresponds to residual?
+From [here](https://masuday.github.io/blupf90_tutorial/vc_gs.html#generated-files)
+
+* postgibbs thinning: "If you want to keep all the samples you have drawn, you have to put the same number as you put before. Or, you can input a multiple of the original number. For example, in this case, you can input 10, 20, 30 and so on, because the original interval was 10. If you type an inappropriate number, the program will stop with a suspicious message."
+* The *independent chain size* corresponds to the number of independent samples that can be seen as independent. If the independent chain size is 3, the statistics (i.e. posterior mean and SD) are equivalently calculated using only 3 independent samples, and obviously, this is too small. This indicates whether you need more samples or not.
 * Effective sample size: "At least > 10 is recommended. > 30 may be better."
+* You can evaluate a sufficient interval for samples to be saved using *Independent chain size* and *Autocorrelations*. Two adjacent samples are usually highly correlated because the next sample is drawn based on the current one. When the correlation is still high between distant samples, the dependency-level is also high and the absolute values of the samples should be very similar.
+
+---
+
 * `postgibbs_samples` file: "The meaning of each column is:
     + Column 1: the sequential number for saved samples.
     + Column 2: the actual round in which each sample was drawn.
@@ -35,8 +42,8 @@ source(here::here("source_functions/read_gibbs.R"))
 
 Sampling parameters:
 
-* 200,000 samples
-* Keep every 20th sample after 10,000 sample burn-in
+* 500,000 samples
+* Keep every 20th sample
 
 # Monte Carlo error by time series 
 
@@ -47,7 +54,7 @@ gibbs_mce <-
                   .y = rep(c(1, 2, 5, 7, 8, 9),
                            times = 5),
                   ~ read_gibbs_mce(iteration = .x,
-                                 region = .y)) %>% 
+                                   region = .y)) %>% 
   select(iter, dataset, everything())
 ```
 
@@ -84,8 +91,8 @@ gibbs_samples <-
                   ~ read_gibbs_samples(iteration = .x,
                                  region = .y)) %>% 
   select(iter, dataset, everything(), -X1, -X3) %>% 
-  purrr::set_names("iter", "dataset", "round", c(1:18)) %>% 
-  tidyr::pivot_longer(cols = c(`1`:`18`),
+  purrr::set_names("iter", "dataset", "round", c(1:14)) %>% 
+  tidyr::pivot_longer(cols = c(`1`:`14`),
                       names_to = "param") %>% 
   mutate(param = case_when(param == "1" ~ "d1d1",
                            param == "2" ~ "d1d2",
@@ -100,11 +107,7 @@ gibbs_samples <-
                            param == "11" ~ "mpe1mpe1",
                            param == "12" ~ "mpe2mpe2",
                            param == "13" ~ "r1r1",
-                           param == "14" ~ "r2r2",
-                           param == "15" ~ "se(d1d2)",
-                           param == "16" ~ "se(m1m2)",
-                           param == "17" ~ "se(d1m1)",
-                           param == "18" ~ "se(d2m2)"),
+                           param == "14" ~ "r2r2"),
          iter = as.character(iter))
   
 ``` 
@@ -116,7 +119,7 @@ gibbs_samples <-
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 1) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
   ggplot(aes(x = round,
              y = value,
              color = param)) +
@@ -131,7 +134,7 @@ gibbs_samples %>%
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 2) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
   ggplot(aes(x = round,
              y = value,
              color = param)) +
@@ -146,7 +149,7 @@ gibbs_samples %>%
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 3) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
   ggplot(aes(x = round,
              y = value,
              color = param)) +
@@ -161,7 +164,7 @@ gibbs_samples %>%
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 4) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
   ggplot(aes(x = round,
              y = value,
              color = param)) +
@@ -177,7 +180,7 @@ gibbs_samples %>%
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 5) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2")) %>% 
+  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
   ggplot(aes(x = round,
              y = value,
              color = param)) +

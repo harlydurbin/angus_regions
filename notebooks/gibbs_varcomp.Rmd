@@ -19,6 +19,7 @@ library(magrittr)
 library(tibble)
 library(purrr)
 library(ggplot2)
+library(stringr)
 library(tidylog)
 
 source(here::here("source_functions/calculate_heritability.R"))

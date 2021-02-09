@@ -14,6 +14,10 @@ source(here::here("source_functions/ped.R"))
 source(here::here("source_functions/write_tworegion_data.R"))
 source(here::here("source_functions/region_key.R"))
 
+## -----------------------------------------------------------------------------
+iter <- as.character(commandArgs(trailingOnly = TRUE)[1])
+
+sample_limit <- as.numeric(commandArgs(trailingOnly = TRUE)[2])
 
 ## -----------------------------------------------------------------------------
 ped <-
@@ -23,12 +27,6 @@ ped <-
 animal_regions <-
   read_rds(here::here("data/derived_data/import_regions/animal_regions.rds"))
   
-## -----------------------------------------------------------------------------
-iter <- as.character(commandArgs(trailingOnly = TRUE)[1])
-
-sample_limit <- as.numeric(commandArgs(trailingOnly = TRUE)[2])
-
-
 ## --------------------------------------------------------------------------
 
 # List of dams with records in region 3 and another region

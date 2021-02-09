@@ -19,3 +19,5 @@ burnin: "0"
 thin: "20"
 
 post_gibbs_burnin: "0"
+
+#nohup echo -e 'renf90.par \n 500000 0 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter3.3v8.out &

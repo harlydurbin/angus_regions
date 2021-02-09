@@ -1,6 +1,6 @@
 read_gibbs_samples <- function(iteration, region) {
   
-  fp <- glue::glue("data/derived_data/varcomp_ww/iter{iteration}/3v{region}/gibbs/postgibbs_samples")
+  fp <- glue::glue("data/derived_data/gibbs_varcomp/iter{iteration}/3v{region}/postgibbs_samples")
   
   if (file.exists(here::here(fp))) {
     
@@ -14,13 +14,13 @@ read_gibbs_samples <- function(iteration, region) {
 
 read_gibbs_mce <- function(iteration, region) {
   
-  fp <- glue::glue("data/derived_data/varcomp_ww/iter{iteration}/3v{region}/gibbs/postout")
+  fp <- glue::glue("data/derived_data/gibbs_varcomp/iter{iteration}/3v{region}/postout")
   
   if (file.exists(here::here(fp))) {
     
     readr::read_table2(here::here(fp),
                        skip = 4,
-                       n_max = 18,
+                       n_max = 14,
                        col_names = c("param", "eff1", "eff2", "trt1", "trt2", "mce", "mean", "hdp", "effective_sample_size", "median", "mode")) %>% 
       dplyr::select(-eff1, -eff2, -trt1, -trt2) %>% 
       dplyr::mutate(param = dplyr::case_when(param == "1" ~ "d1d1",
@@ -36,13 +36,10 @@ read_gibbs_mce <- function(iteration, region) {
                                              param == "11" ~ "mpe1mpe1",
                                              param == "12" ~ "mpe2mpe2",
                                              param == "13" ~ "r1r1",
-                                             param == "14" ~ "r2r2",
-                                             param == "15" ~ "se(d1d2)",
-                                             param == "16" ~ "se(m1m2)",
-                                             param == "17" ~ "se(d1m1)",
-                                             param == "18" ~ "se(d2m2)"),
+                                             param == "14" ~ "r2r2"),
                     iter = iteration,
-                    dataset = glue::glue("3v{region}")) 
+                    dataset = glue::glue("3v{region}"),
+                    effective_sample_size = abs(effective_sample_size)) 
     
   }
   
@@ -50,14 +47,14 @@ read_gibbs_mce <- function(iteration, region) {
 
 read_gibbs_psd <- function(iteration, region) {
   
-  fp <- glue::glue("data/derived_data/varcomp_ww/iter{iteration}/3v{region}/gibbs/postout")
+  fp <- glue::glue("data/derived_data/gibbs_varcomp/iter{iteration}/3v{region}/postout")
   
   if (file.exists(here::here(fp))) {
     
     readr::read_table2(here::here(fp),
-                       skip = 27,
-                       n_max = 18,
-                       col_names = c("param", "eff1", "eff2", "trt1", "trt2", "psd", "mean", "psd_interval_lo", "psd_interval_hi", "convergence", "auto_lag1", "auto_lag10", "auto_lag50", "independent_batches")) %>% 
+                       skip = 22,
+                       n_max = 14,
+                       col_names = c("param", "eff1", "eff2", "trt1", "trt2", "psd", "mean", "psd_interval_lo", "psd_interval_hi", "geweke", "auto_lag1", "auto_lag10", "auto_lag50", "independent_batches")) %>% 
       dplyr::select(-eff1, -eff2, -trt1, -trt2) %>% 
       dplyr::mutate(param = dplyr::case_when(param == "1" ~ "d1d1",
                                              param == "2" ~ "d1d2",
@@ -72,20 +69,17 @@ read_gibbs_psd <- function(iteration, region) {
                                              param == "11" ~ "mpe1mpe1",
                                              param == "12" ~ "mpe2mpe2",
                                              param == "13" ~ "r1r1",
-                                             param == "14" ~ "r2r2",
-                                             param == "15" ~ "se(d1d2)",
-                                             param == "16" ~ "se(m1m2)",
-                                             param == "17" ~ "se(d1m1)",
-                                             param == "18" ~ "se(d2m2)"),
+                                             param == "14" ~ "r2r2"),
                     iter = iteration,
-                    dataset = glue::glue("3v{region}")) 
+                    dataset = glue::glue("3v{region}"),
+                    geweke = abs(geweke)) 
   }
   
 }
 
 read_gibbs_corr <- function(iteration, dataset) {
   
-  fp <- glue::glue("data/derived_data/varcomp_ww/iter{iteration}/3v{dataset}/gibbs/postmeanCorr")
+  fp <- glue::glue("data/derived_data/gibbs_varcomp/iter{iteration}/3v{dataset}/postmeanCorr")
   
   if (file.exists(here::here(fp))) {
     corrmat <-
@@ -94,10 +88,7 @@ read_gibbs_corr <- function(iteration, dataset) {
                          n_max = 4,
                          col_names = FALSE) %>% 
       janitor::remove_empty(which = c("rows", "cols")) %>% 
-      purrr::set_names("3_dir", glue("{dataset}_dir"), "3_mat", glue("{dataset}_mat")) %>% 
-      as.matrix()
-    
-    corrmat[lower.tri(corrmat, diag = TRUE)] <- rlang::na_dbl
+      purrr::set_names("3_dir", glue("{dataset}_dir"), "3_mat", glue("{dataset}_mat"))
     
     corrmat %>%
       tibble::as.tibble() %>% 
@@ -113,7 +104,7 @@ read_gibbs_corr <- function(iteration, dataset) {
 
 read_gibbs_varcov <- function(iteration, dataset) {
   
-  fp <- glue("data/derived_data/varcomp_ww/iter{iteration}/3v{dataset}/gibbs/postmean")
+  fp <- glue("data/derived_data/gibbs_varcomp/iter{iteration}/3v{dataset}/postmean")
   
   if (file.exists(here::here(fp))) {
     
@@ -173,11 +164,18 @@ read_gibbs_h2 <- function(iteration, dataset) {
     filter(num == dataset) %>% 
     pull(desc)
   
-  read_gibbs_varcov(iteration = iteration, 
-                    dataset = dataset) %>% 
-    biv_heritability(abbrvs = c("3", as.character(dataset)),
+  varcov <-
+    read_gibbs_varcov(iteration = iteration, 
+                    dataset = dataset) 
+  
+  if(!is.null(varcov)){
+    varcov %<>% 
+      biv_heritability(abbrvs = c("3", as.character(dataset)),
                      descs = c(desc1, desc2),
                      mat = TRUE,
                      mpe = TRUE) %>% 
     mutate(iter = iteration)
+    
+    return(varcov)
+  }
 }

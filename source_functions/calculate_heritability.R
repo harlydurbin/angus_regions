@@ -17,30 +17,26 @@ biv_heritability <-
       # Takes the "long" output of melt_aireml
       # One row for each variance or covariance
       df %>%
-      mutate(
-        key =
-          case_when(
-            str_detect(val1, r1_abbrv) ~ r1_desc,
-            str_detect(val1, r2_abbrv) ~ r2_desc,
-          ),
-        # Direct/maternal covariance
-        val1 =
-          case_when(val1 == glue::glue("{r1_abbrv}_dir") &
-                      val2 == glue::glue("{r1_abbrv}_mat") ~
-                      glue::glue("{r1_abbrv}_dir_mat"),
-                    val1 == glue::glue("{r2_abbrv}_dir") &
-                      val2 == glue::glue("{r2_abbrv}_mat") ~
-                      glue::glue("{r2_abbrv}_dir_mat"),
-                    TRUE ~ val1),
-        val2 = if_else(str_detect(val1,
-                                  "dir_mat"),
-                       val1,
-                       val2)) %>%
+      mutate(key = case_when(stringr::str_detect(val1, r1_abbrv) ~ r1_desc,
+                             stringr::str_detect(val1, r2_abbrv) ~ r2_desc),
+              # Direct/maternal covariance
+              val1 =
+                case_when(val1 == glue::glue("{r1_abbrv}_dir") &
+                            val2 == glue::glue("{r1_abbrv}_mat") ~
+                            glue::glue("{r1_abbrv}_dir_mat"),
+                          val1 == glue::glue("{r2_abbrv}_dir") &
+                            val2 == glue::glue("{r2_abbrv}_mat") ~
+                            glue::glue("{r2_abbrv}_dir_mat"),
+                          TRUE ~ val1),
+              val2 = if_else(stringr::str_detect(val1,
+                                                 "dir_mat"),
+                             val1,
+                             val2)) %>%
       filter(val1 == val2) %>%
       select(-val2) %>%
       # Pivot to wide format
-      mutate(val1 = str_remove(val1,
-                               glue::glue("{r1_abbrv}_|{r2_abbrv}_"))) %>%
+      mutate(val1 = stringr::str_remove(val1,
+                                        glue::glue("{r1_abbrv}_|{r2_abbrv}_"))) %>%
       tidyr::pivot_wider(id_cols = key,
                          names_from = val1,
                          values_from = var_cov)
@@ -114,17 +110,16 @@ univ_heritability <-
         # Direct/maternal covariance
         val1 =
           case_when(
-            str_detect(val1, "dir") & str_detect(val2, "mat") ~ glue::glue("{abbrv}_dir_mat"),
+            stringr::str_detect(val1, "dir") & stringr::str_detect(val2, "mat") ~ glue::glue("{abbrv}_dir_mat"),
             TRUE ~ val1
           ),
-        val2 = if_else(str_detect(val1, "dir_mat"), val1, val2)
+        val2 = if_else(stringr::str_detect(val1, "dir_mat"), val1, val2)
       ) %>%
       filter(val1 == val2) %>%
       select(-val2) %>% 
-      mutate(val1 = str_remove(val1, glue::glue("{abbrv}_"))) %>%
-      tidyr::pivot_wider(
-        names_from = val1,
-        values_from = var_cov)
+      mutate(val1 = stringr::str_remove(val1, glue::glue("{abbrv}_"))) %>%
+      tidyr::pivot_wider(names_from = val1,
+                         values_from = var_cov)
     
     # Determine effects
     effects <- colnames(spread1)
