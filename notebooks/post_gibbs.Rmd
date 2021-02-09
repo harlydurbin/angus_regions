@@ -40,12 +40,19 @@ From [here](https://masuday.github.io/blupf90_tutorial/vc_gs.html#generated-file
 
 ---
 
+`find data/derived_data/gibbs_varcomp -type f -name 'last_solutions' | sed -r 's|/[^/]+$||' |sort |uniq`
+
+nohup echo -e 'renf90.par \n 500000 0 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.3v7.continue.out &
+
+---
+
 Sampling parameters:
 
 * 500,000 samples
-* Keep every 20th sample
+* 100,000 burnin
+* Keep every 100th sample
 
-# Monte Carlo error by time series 
+# Setup
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_mce <-
@@ -58,12 +65,6 @@ gibbs_mce <-
   select(iter, dataset, everything())
 ```
 
-```{r, echo=FALSE}
-DT::datatable(gibbs_mce, rownames = FALSE)
-```
-
-# Posterior standard deviation
-
 ```{r, message= FALSE, warning=FALSE}
 gibbs_psd <-
   purrr::map2_dfr(.x = rep(c(1:5), 
@@ -75,12 +76,6 @@ gibbs_psd <-
   select(iter, dataset, everything())
 
 ```
-
-```{r, echo=FALSE}
-DT::datatable(gibbs_psd, rownames = FALSE)
-```
-
-# Post burn-in samples
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_samples <-
@@ -112,81 +107,105 @@ gibbs_samples <-
   
 ``` 
 
-## Plot samples {.tabset}
+# Sanity check
 
-### Iteration 1
+* Make sure every parameter has the correct number of iterations
+
+```{r}
+gibbs_samples %>% 
+  group_by(iter, dataset, param) %>% 
+  tally(sort = TRUE)
+```
+
+```{r}
+gibbs_samples %>% 
+  distinct(iter, dataset) %>% 
+  arrange(dataset, iter)
+```
+
+# Monte Carlo error by time series 
+
+```{r, echo=FALSE}
+DT::datatable(gibbs_mce, rownames = FALSE)
+```
+
+# Posterior standard deviation
+
+```{r, echo=FALSE}
+DT::datatable(gibbs_psd, rownames = FALSE)
+```
+
+* Parameters with fewer than 10 independent batches
+
+```{r}
+gibbs_psd %>% 
+  filter(10 > independent_batches) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
+* Which iterations/datasets do they come from?
+
+```{r}
+gibbs_psd %>% 
+  filter(10 > independent_batches) %>% 
+  distinct(iter, dataset) %>% 
+  arrange(iter, dataset)
+```
+
+# Plot post-burnin and post-thinning samples {.tabset}
+
+```{r}
+plot_gibbs <-
+  function(df) {
+    df %>% 
+      filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
+      ggplot(aes(x = round,
+                 y = value,
+                 color = param)) +
+      geom_line() +
+      ggsci::scale_color_ucscgb() +
+      theme_classic() +
+      facet_wrap(~ dataset, nrow = 3)
+  }
+```
+
+## Iteration 1
 
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 1) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
-  ggplot(aes(x = round,
-             y = value,
-             color = param)) +
-  geom_line() +
-  theme_classic() +
-  facet_wrap(~ dataset, nrow = 3)
-
+  plot_gibbs()
 ```
 
-### Iteration 2
+## Iteration 2
 
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 2) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
-  ggplot(aes(x = round,
-             y = value,
-             color = param)) +
-  geom_line() +
-  theme_classic() +
-  facet_wrap(~ dataset, nrow = 3)
-
+  plot_gibbs()
 ```
 
-### Iteration 3
+## Iteration 3
 
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 3) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
-  ggplot(aes(x = round,
-             y = value,
-             color = param)) +
-  geom_line() +
-  theme_classic() +
-  facet_wrap(~ dataset, nrow = 3)
-
+  plot_gibbs()
 ```
 
-### Iteration 4
+## Iteration 4
 
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 4) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
-  ggplot(aes(x = round,
-             y = value,
-             color = param)) +
-  geom_line() +
-  theme_classic() +
-  facet_wrap(~ dataset, nrow = 3)
-
+  plot_gibbs()
 ```
 
-
-### Iteration 5
+## Iteration 5
 
 ```{r, fig.width=12, fig.height=10}
 gibbs_samples %>% 
   filter(iter == 5) %>% 
-  filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
-  ggplot(aes(x = round,
-             y = value,
-             color = param)) +
-  geom_line() +
-  theme_classic() +
-  facet_wrap(~ dataset, nrow = 3)
-
+  plot_gibbs()
 ```
 

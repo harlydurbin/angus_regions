@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=100 -j 20 --config &> log/snakemake_log/gibbs_varcomp/210203.gibbs_varcomp.log &
+# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=100 -j 20 --config --until gibbs &> log/snakemake_log/gibbs_varcomp/210209.gibbs_varcomp.log &
 
 import os
 
@@ -76,20 +76,21 @@ rule gibbs:
         gibbs_out = "gibbs.iter{iter}.{dataset}.out",
         psrecord = "/home/agiintern/angus_regions/log/psrecord/gibbs_varcomp/gibbs/gibbs.iter{iter}.{dataset}.log"
     output:
-        dummy = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/gibbs.iter{iter}.{dataset}.out"
+        out = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/gibbs.iter{iter}.{dataset}.out",
+        dummy = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/dummy.txt"
     shell:
         """
         cd {params.directory}
         psrecord "echo -e 'renf90.par \\n {params.rounds} {params.burnin} \\n {params.thin}' | {params.gibbs_path} &> {params.gibbs_out}" --log {params.psrecord} --include-children --interval 5
         cp last_solutions last_solutions_backup
-        echo "done" dummy.txt
+        echo "done" > dummy.txt
         """
 
 rule post_gibbs:
     resources:
         load = 10
     input:
-        dummy = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/gibbs.iter{iter}.{dataset}.out"
+        dummy = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/dummy.txt"
     params:
         directory = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}",
     output:
@@ -102,6 +103,6 @@ rule post_gibbs:
         child.expect('Burn-in?')
         child.sendline(config['post_gibbs_burnin'])
         child.expect('Give n to read')
-        child.sendline(config['thin'])
+        child.sendline(config['post_gibbs_thin'])
         child.expect('Choose a graph for samples')
         child.sendline('0')

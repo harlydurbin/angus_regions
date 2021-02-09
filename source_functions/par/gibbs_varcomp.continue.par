@@ -39,14 +39,8 @@ pedigree
 0 200
 OPTION residual
 OPTION cat 0 0
-OPTION sol se
 OPTION use_yams
-OPTION fact_one file
-OPTION sex_chr 30
-# G_eff1_eff2_trt1_trt2
-OPTION se_covar_function d1d2 G_2_2_1_2/(G_2_2_1_1*G_2_2_2_2)**0.5
-OPTION se_covar_function m1m2 G_3_3_1_2/(G_3_3_1_1*G_3_3_2_2)**0.5
-OPTION se_covar_function d1m1 G_2_3_1_1/(G_2_2_1_1*G_3_3_1_1)**0.5
-OPTION se_covar_function d2m2 G_2_3_2_2/(G_2_2_2_2*G_3_3_2_2)**0.5
 OPTION seed 817 712
-OPTION cont 200000
+# Save samples every 1,000 rounds in order to re-start/continue if need be
+OPTION save_halfway_samples 1000
+OPTION cont 500000
