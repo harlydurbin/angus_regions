@@ -23,12 +23,22 @@ source(here::here("source_functions/read_gibbs.R"))
 
 # Notes & questions
 
-From [here](https://masuday.github.io/blupf90_tutorial/vc_gs.html#generated-files)
+From [here:](https://masuday.github.io/blupf90_tutorial/vc_gs.html#generated-files)
 
 * postgibbs thinning: "If you want to keep all the samples you have drawn, you have to put the same number as you put before. Or, you can input a multiple of the original number. For example, in this case, you can input 10, 20, 30 and so on, because the original interval was 10. If you type an inappropriate number, the program will stop with a suspicious message."
-* The *independent chain size* corresponds to the number of independent samples that can be seen as independent. If the independent chain size is 3, the statistics (i.e. posterior mean and SD) are equivalently calculated using only 3 independent samples, and obviously, this is too small. This indicates whether you need more samples or not.
-* Effective sample size: "At least > 10 is recommended. > 30 may be better."
-* You can evaluate a sufficient interval for samples to be saved using *Independent chain size* and *Autocorrelations*. Two adjacent samples are usually highly correlated because the next sample is drawn based on the current one. When the correlation is still high between distant samples, the dependency-level is also high and the absolute values of the samples should be very similar.
+* The **independent chain size** corresponds to the number of independent samples that can be seen as independent. If the independent chain size is 3, the statistics (i.e. posterior mean and SD) are equivalently calculated using only 3 independent samples, and obviously, this is too small. This indicates whether you need more samples or not.
+* **Effective sample size:** "At least > 10 is recommended. > 30 may be better."
+* You can evaluate a sufficient interval for samples to be saved using **Independent chain size** and **Autocorrelations**. Two adjacent samples are usually highly correlated because the next sample is drawn based on the current one. When the correlation is still high between distant samples, the dependency-level is also high and the absolute values of the samples should be very similar.
+
+---
+
+[**Geweke (1992) convergence diagnostic**](http://pymc-devs.github.io/pymc/modelchecking.html?highlight=gewek) "is a time-series approach that compares the mean and variance of segments from the beginning and end of a single chain."
+
+$$z = \frac{\theta_a-\theta_b}{\sqrt{Var(\theta_a)+Var(\theta_b)}} $$
+
+"where a is the early interval and b the late interval. If the z-scores (theoretically distributed as standard normal variates) of these two segments are similar, it can provide evidence for convergence... If the chain has converged, the **majority of points should fall within 2 standard deviations of zero**... The occurrence of the scores well within 2 standard deviations of zero does not indicate lack of convergence, while deviations exceeding 2 standard deviations suggest that additional samples are required to achieve convergence"
+
+* What portions of chain is `postgibbs` using? Last sample and what?
 
 ---
 
