@@ -42,15 +42,14 @@ From [here](https://masuday.github.io/blupf90_tutorial/vc_gs.html#generated-file
 
 `find data/derived_data/gibbs_varcomp -type f -name 'last_solutions' | sed -r 's|/[^/]+$||' |sort |uniq`
 
-nohup echo -e 'renf90.par \n 500000 0 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.3v7.continue.out &
+`nohup echo -e 'renf90.par \n 500000 0 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.3v7.continue.out &`
 
----
 
-Sampling parameters:
+## Sampling parameters:
 
-* 500,000 samples
-* 100,000 burnin
-* Keep every 100th sample
+* 500,000 total samples
+* 100,000 burnin removed in `postgibbs`
+* Kept every 20th sample during sampling, thinned to every 100th sample in `postgibbs`
 
 # Setup
 
