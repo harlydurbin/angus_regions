@@ -164,10 +164,10 @@ gibbs_psd %>%
 # Plot post-burnin and post-thinning samples {.tabset}
 
 ```{r}
-plot_gibbs <-
+plot_gibbs_iter <-
   function(df) {
     df %>% 
-      filter(param %in% c("d1d1", "d1d2", "d2d2", "m1m1", "m1m2", "m2m2", "mpe1mpe1", "mpe2mpe2")) %>% 
+      filter(!stringr::str_detect(param, "r|mpe")) %>% 
       ggplot(aes(x = round,
                  y = value,
                  color = param)) +
@@ -178,43 +178,70 @@ plot_gibbs <-
   }
 ```
 
-## Iteration 1
-
-```{r, fig.width=12, fig.height=10}
-gibbs_samples %>% 
-  filter(iter == 1) %>% 
-  plot_gibbs()
+```{r}
+plot_gibbs_region <- 
+  function(df) {
+    df %>% 
+      filter(!stringr::str_detect(param, "r|mpe")) %>% 
+      mutate(iter = glue("Iteration {iter}")) %>% 
+      ggplot(aes(x = round, 
+                 y = value,
+                 color = param)) +
+      geom_line() +
+      theme_classic() +
+      ggsci::scale_color_ucscgb() +
+      labs(x = "Round", 
+           y = "Value",
+           color = "Parameter") +
+      facet_wrap(~ iter, ncol = 1)
+  }
+  
 ```
 
-## Iteration 2
+## Desert
 
-```{r, fig.width=12, fig.height=10}
+```{r, fig.width=8, fig.height=12}
 gibbs_samples %>% 
-  filter(iter == 2) %>% 
-  plot_gibbs()
+  filter(dataset == "3v1") %>% 
+  plot_gibbs_region()
 ```
 
-## Iteration 3
+## Southeast
 
-```{r, fig.width=12, fig.height=10}
+```{r, fig.width=8, fig.height=12}
 gibbs_samples %>% 
-  filter(iter == 3) %>% 
-  plot_gibbs()
+  filter(dataset == "3v2") %>% 
+  plot_gibbs_region()
 ```
 
-## Iteration 4
+## Arid Prairie
 
-```{r, fig.width=12, fig.height=10}
+```{r, fig.width=8, fig.height=12}
 gibbs_samples %>% 
-  filter(iter == 4) %>% 
-  plot_gibbs()
+  filter(dataset == "3v5") %>% 
+  plot_gibbs_region()
 ```
 
-## Iteration 5
+## Forested Mountains
 
-```{r, fig.width=12, fig.height=10}
+```{r, fig.width=8, fig.height=12}
 gibbs_samples %>% 
-  filter(iter == 5) %>% 
-  plot_gibbs()
+  filter(dataset == "3v7") %>% 
+  plot_gibbs_region()
 ```
 
+## Fescue Belt
+
+```{r, fig.width=8, fig.height=12}
+gibbs_samples %>% 
+  filter(dataset == "3v8") %>% 
+  plot_gibbs_region()
+```
+
+## Upper Midwest & Northeast
+
+```{r, fig.width=8, fig.height=12}
+gibbs_samples %>% 
+  filter(dataset == "3v9") %>% 
+  plot_gibbs_region()
+```
