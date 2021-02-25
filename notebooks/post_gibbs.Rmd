@@ -58,7 +58,7 @@ $$z = \frac{\theta_a-\theta_b}{\sqrt{Var(\theta_a)+Var(\theta_b)}} $$
 ## Sampling parameters:
 
 * 1,000,000 total samples
-* No burnin removed in `postgibbs`
+* Burn-in of 50,000 samples removed in `postgibbs`
 * Kept every 20th sample during sampling, thinned to every 100th sample in `postgibbs`
 
 # Setup
