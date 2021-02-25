@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/aireml_varcomp.snakefile --keep-going --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 30 --resources load=200 -j 24 --config &> log/snakemake_log/aireml_varcomp/210225.aireml_varcomp.log &
+# nohup snakemake -s source_functions/aireml_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 30 --resources load=200 -j 24 --config &> log/snakemake_log/aireml_varcomp/210225.aireml_varcomp.log &
 
 configfile: "source_functions/config/aireml_varcomp.config.yaml"
 
@@ -73,8 +73,7 @@ rule aireml:
     shell:
         """
         cd {params.directory}
-        ulimit -S -s unlimited
-        ulimit -H -s unlimited
+        export OMP_NUM_THREADS=6
         {params.aireml_path} renf90.par &> {params.aireml_out}
         mv airemlf90.log {params.aireml_renamed}
         """

@@ -31,3 +31,4 @@ pedigree
 OPTION residual
 OPTION sol se
 OPTION use_yams
+OPTION nthreads 6
