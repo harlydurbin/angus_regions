@@ -21,7 +21,7 @@ read_gibbs_mce <- function(iteration, region) {
     readr::read_table2(here::here(fp),
                        skip = 4,
                        n_max = 14,
-                       col_names = c("param", "eff1", "eff2", "trt1", "trt2", "mce", "mean", "hdp", "effective_sample_size", "median", "mode")) %>% 
+                       col_names = c("param", "eff1", "eff2", "trt1", "trt2", "mce", "mean", "hpd_lo", "hpd_hi", "effective_sample_size", "median", "mode", "idependent_chain_size")) %>% 
       dplyr::select(-eff1, -eff2, -trt1, -trt2) %>% 
       dplyr::mutate(param = dplyr::case_when(param == "1" ~ "d1d1",
                                              param == "2" ~ "d1d2",
@@ -38,8 +38,8 @@ read_gibbs_mce <- function(iteration, region) {
                                              param == "13" ~ "r1r1",
                                              param == "14" ~ "r2r2"),
                     iter = iteration,
-                    dataset = glue::glue("3v{region}"),
-                    effective_sample_size = abs(effective_sample_size)) 
+                    dataset = glue::glue("3v{region}")) %>% 
+      dplyr::mutate_at(vars(contains("hpd"), "effective_sample_size"), ~ abs(.))
     
   }
   
@@ -54,7 +54,7 @@ read_gibbs_psd <- function(iteration, region) {
     readr::read_table2(here::here(fp),
                        skip = 22,
                        n_max = 14,
-                       col_names = c("param", "eff1", "eff2", "trt1", "trt2", "psd", "mean", "psd_interval_lo", "psd_interval_hi", "geweke", "auto_lag1", "auto_lag10", "auto_lag50", "independent_batches")) %>% 
+                       col_names = c("param", "eff1", "eff2", "trt1", "trt2", "psd", "mean", "psd_lo", "psd_hi", "geweke", "auto_lag1", "auto_lag10", "auto_lag50", "independent_batches")) %>% 
       dplyr::select(-eff1, -eff2, -trt1, -trt2) %>% 
       dplyr::mutate(param = dplyr::case_when(param == "1" ~ "d1d1",
                                              param == "2" ~ "d1d2",
@@ -71,8 +71,8 @@ read_gibbs_psd <- function(iteration, region) {
                                              param == "13" ~ "r1r1",
                                              param == "14" ~ "r2r2"),
                     iter = iteration,
-                    dataset = glue::glue("3v{region}"),
-                    geweke = abs(geweke)) 
+                    dataset = glue::glue("3v{region}")) %>% 
+      dplyr::mutate_at(vars(contains("lag"), "geweke", "independent_batches"), ~ abs(.))
   }
   
 }
@@ -97,7 +97,7 @@ read_gibbs_corr <- function(iteration, dataset) {
                           names_to = "val2",
                           values_to = "corr") %>% 
       dplyr::filter(!is.na(corr)) %>% 
-      mutate(iter = iteration)
+      dplyr::mutate(iter = iteration)
   
   }
 }
@@ -144,10 +144,10 @@ read_gibbs_varcov <- function(iteration, dataset) {
                           names_to = "val2",
                           values_to = "var_cov") 
     
-    bind_rows(g_cov,
-              mpe_cov,
-              r_cov) %>% 
-      mutate(iter = iteration)
+    dplyr::bind_rows(g_cov,
+                     mpe_cov,
+                     r_cov) %>% 
+      dplyr::mutate(iter = iteration)
     
   }
 }
@@ -155,7 +155,7 @@ read_gibbs_varcov <- function(iteration, dataset) {
 read_gibbs_h2 <- function(iteration, dataset) {
   
   source(here::here("source_functions/region_key.R"))
-  
+  source(here::here("source_functions/calculate_heritability.R"))
   
   desc1 <- "High Plains"
   

@@ -20,7 +20,8 @@ library(tibble)
 library(purrr)
 library(ggplot2)
 library(stringr)
-library(tidylog)
+
+complete_samples <- 9500
 
 source(here::here("source_functions/calculate_heritability.R"))
 source(here::here("source_functions/read_gibbs.R"))
@@ -32,6 +33,46 @@ source(here::here("source_functions/region_key.R"))
 
 # Setup 
 
+```{r, message= FALSE, warning=FALSE}
+gibbs_samples <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_samples(iteration = .x,
+                                 region = .y)) %>% 
+  select(iter, dataset, everything(), -X1, -X3) %>% 
+  purrr::set_names("iter", "dataset", "round", c(1:14)) %>% 
+  tidyr::pivot_longer(cols = c(`1`:`14`),
+                      names_to = "param") %>% 
+  mutate(param = case_when(param == "1" ~ "d1d1",
+                           param == "2" ~ "d1d2",
+                           param == "3" ~ "d1m1",
+                           param == "4" ~ "d1m2",
+                           param == "5" ~ "d2d2",
+                           param == "6" ~ "d2m1",
+                           param == "7" ~ "d2m2",
+                           param == "8" ~ "m1m1",
+                           param == "9" ~ "m1m2",
+                           param == "10" ~ "m2m2",
+                           param == "11" ~ "mpe1mpe1",
+                           param == "12" ~ "mpe2mpe2",
+                           param == "13" ~ "r1r1",
+                           param == "14" ~ "r2r2"),
+         iter = as.character(iter))
+  
+``` 
+
+```{r}
+n_samples <-
+  gibbs_samples %>% 
+  group_by(iter, dataset, param) %>% 
+  tally(name = "n_samples") %>% 
+  ungroup() %>% 
+  mutate(iter = as.numeric(iter)) %>% 
+  distinct(iter, dataset, n_samples) 
+```
+
 ```{r, warning=FALSE, message=FALSE}
 gibbs_varcomp <-
   purrr::map2_dfr(.x = rep(c(1:5), 
@@ -39,7 +80,9 @@ gibbs_varcomp <-
                   .y = rep(c(1, 2, 5, 7, 8, 9),
                            times = 5),
                   ~ read_gibbs_varcov(iteration = .x,
-                                      dataset = .y)) 
+                                      dataset = .y) %>% 
+                    mutate(dataset = glue("3v{.y}")))
+  
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -49,7 +92,8 @@ gibbs_corr <-
                   .y = rep(c(1, 2, 5, 7, 8, 9),
                            times = 5),
                   ~ read_gibbs_corr(iteration = .x,
-                                    dataset = .y)) 
+                                    dataset = .y) %>% 
+                    mutate(dataset = glue("3v{.y}")))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -59,28 +103,33 @@ gibbs_h2 <-
                   .y = rep(c(1, 2, 5, 7, 8, 9),
                            times = 5),
                   ~ read_gibbs_h2(iteration = .x,
-                                  dataset = .y)) 
+                                  dataset = .y) %>% 
+                    mutate(dataset = glue("3v{.y}"))) 
 ```
 
 # Heritabilities
 
 ```{r}
 gibbs_h2 %>% 
-  select(Comparison = key, Iteration = iter, everything()) %>% 
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>% 
+  select(Comparison = key, Iteration = iter, everything(), -n_samples) %>% 
   arrange(Comparison, Iteration)
 ```
 
 # Genetic correlations
 
-## Weaning weight direct, High Plains vs. other
+## Direct effect, High Plains vs. other
 
 ```{r}
 gibbs_corr %>% 
-  filter(str_detect(val1, "3_dir")) %>% 
-  filter(str_detect(val2, "dir") & !str_detect(val2, "3")) %>% 
-  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  filter(stringr::str_detect(val1, "3_dir")) %>% 
+  filter(stringr::str_detect(val2, "dir") & !stringr::str_detect(val2, "3")) %>% 
+  mutate(num = as.numeric(stringr::str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>% 
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>% 
   select(Comparison = desc,
          Iteration = iter,
          Correlation = corr) %>% 
@@ -94,6 +143,8 @@ gibbs_corr %>%
   mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>% 
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>% 
   select(Comparison = desc,
          Iteration = iter,
          Correlation = corr) %>% 
@@ -113,6 +164,8 @@ gibbs_corr %>%
   mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>% 
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>%
   select(Comparison = desc,
          Iteration = iter,
          Correlation = corr) %>% 
@@ -125,7 +178,9 @@ gibbs_corr %>%
   filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
   mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
-              select(num, desc)) %>% 
+              select(num, desc)) %>%
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>%
   select(Comparison = desc,
          Iteration = iter,
          Correlation = corr) %>% 

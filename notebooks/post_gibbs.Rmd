@@ -29,6 +29,7 @@ From [here:](https://masuday.github.io/blupf90_tutorial/vc_gs.html#generated-fil
 * The **independent chain size** corresponds to the number of independent samples that can be seen as independent. If the independent chain size is 3, the statistics (i.e. posterior mean and SD) are equivalently calculated using only 3 independent samples, and obviously, this is too small. This indicates whether you need more samples or not.
 * **Effective sample size:** "At least > 10 is recommended. > 30 may be better."
 * You can evaluate a sufficient interval for samples to be saved using **Independent chain size** and **Autocorrelations**. Two adjacent samples are usually highly correlated because the next sample is drawn based on the current one. When the correlation is still high between distant samples, the dependency-level is also high and the absolute values of the samples should be very similar.
+* When the distribution of the samples is not normal, there is a difference between “Mode” and “Mean”
 
 ---
 
@@ -52,39 +53,15 @@ $$z = \frac{\theta_a-\theta_b}{\sqrt{Var(\theta_a)+Var(\theta_b)}} $$
 
 `find data/derived_data/gibbs_varcomp -type f -name 'last_solutions' | sed -r 's|/[^/]+$||' |sort |uniq`
 
-`nohup echo -e 'renf90.par \n 500000 0 \n 20' | /usr/local/bin/thrgibbs1f90 &> gibbs.iter1.3v7.continue.out &`
-
+`nohup echo -e 'renf90.par \n 500000 0 \n 20' | /usr/local/bin/thrgibbs1f90 > gibbs.iter4.3v2.continue.out & exit`
 
 ## Sampling parameters:
 
-* 500,000 total samples
-* 100,000 burnin removed in `postgibbs`
+* 1,000,000 total samples
+* No burnin removed in `postgibbs`
 * Kept every 20th sample during sampling, thinned to every 100th sample in `postgibbs`
 
 # Setup
-
-```{r, message= FALSE, warning=FALSE}
-gibbs_mce <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
-                           times = 6),
-                  .y = rep(c(1, 2, 5, 7, 8, 9),
-                           times = 5),
-                  ~ read_gibbs_mce(iteration = .x,
-                                   region = .y)) %>% 
-  select(iter, dataset, everything())
-```
-
-```{r, message= FALSE, warning=FALSE}
-gibbs_psd <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
-                           times = 6),
-                  .y = rep(c(1, 2, 5, 7, 8, 9),
-                           times = 5),
-                  ~ read_gibbs_psd(iteration = .x,
-                                 region = .y)) %>% 
-  select(iter, dataset, everything())
-
-```
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_samples <-
@@ -116,6 +93,36 @@ gibbs_samples <-
   
 ``` 
 
+```{r, message= FALSE, warning=FALSE}
+gibbs_mce <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_mce(iteration = .x,
+                                   region = .y)) %>%
+  left_join(gibbs_samples %>% 
+              mutate(iter = as.integer(iter)) %>% 
+              group_by(iter, dataset, param) %>% 
+              tally(name = "n_samples")) %>% 
+  select(iter, dataset, param, n_samples, everything()) 
+```
+
+```{r, message= FALSE, warning=FALSE}
+gibbs_psd <-
+  purrr::map2_dfr(.x = rep(c(1:5), 
+                           times = 6),
+                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 5),
+                  ~ read_gibbs_psd(iteration = .x,
+                                 region = .y)) %>%
+  left_join(gibbs_samples %>% 
+              mutate(iter = as.integer(iter)) %>% 
+              group_by(iter, dataset, param) %>% 
+              tally(name = "n_samples")) %>% 
+  select(iter, dataset, param, n_samples, everything()) 
+```
+
 # Sanity check
 
 * Make sure every parameter has the correct number of iterations
@@ -123,7 +130,9 @@ gibbs_samples <-
 ```{r}
 gibbs_samples %>% 
   group_by(iter, dataset, param) %>% 
-  tally(sort = TRUE)
+  tally(sort = TRUE) %>% 
+  ungroup() %>% 
+  distinct(iter, dataset, n)
 ```
 
 ```{r}
