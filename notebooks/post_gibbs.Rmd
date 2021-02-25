@@ -147,27 +147,26 @@ gibbs_samples %>%
 DT::datatable(gibbs_mce, rownames = FALSE)
 ```
 
+## Parameters with effective sample size lower than 10
+
+```{r}
+gibbs_mce %>% 
+  filter(10 > effective_sample_size) %>% 
+  DT::datatable(rownames = FALSE)
+```
+
 # Posterior standard deviation
 
 ```{r, echo=FALSE}
 DT::datatable(gibbs_psd, rownames = FALSE)
 ```
 
-* Parameters with fewer than 10 independent batches
+## Parameters with fewer than 10 independent batches
 
 ```{r}
 gibbs_psd %>% 
   filter(10 > independent_batches) %>% 
   DT::datatable(rownames = FALSE)
-```
-
-* Which iterations/datasets do they come from?
-
-```{r}
-gibbs_psd %>% 
-  filter(10 > independent_batches) %>% 
-  distinct(iter, dataset) %>% 
-  arrange(iter, dataset)
 ```
 
 # Plot post-burnin and post-thinning samples {.tabset}
