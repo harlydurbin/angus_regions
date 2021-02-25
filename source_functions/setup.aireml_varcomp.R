@@ -25,9 +25,7 @@ dataset <- as.character(commandArgs(trailingOnly = TRUE)[2])
 ## -----------------------------------------------------------------
 gibbs_path <- glue("data/derived_data/gibbs_varcomp/iter{iter}/{dataset}")
 
-#aireml_par <- glue("data/derived_data/aireml_varcomp/iter{iter}/{dataset}/aireml_varcomp.par")
-
-aireml_par <- "test.par"
+aireml_par <- glue("data/derived_data/aireml_varcomp/iter{iter}/{dataset}/aireml_varcomp.par")
 
 base_par <- "source_functions/par/aireml_varcomp.par"
 

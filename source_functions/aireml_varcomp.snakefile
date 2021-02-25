@@ -1,108 +1,75 @@
-# nohup snakemake -s source_functions/varcomp_ww.snakefile --keep-going --directory /home/agiintern/regions --rerun-incomplete --latency-wait 90 --resources load=160 -j 24 --config &> log/snakemake_log/varcomp_ww/201008.varcomp_ww.log &
+# nohup snakemake -s source_functions/aireml_varcomp.snakefile --keep-going --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 30 --resources load=200 -j 24 --config &> log/snakemake_log/aireml_varcomp/210225.aireml_varcomp.log &
 
-import os
-
-# Make log directories if they don't exist
-os.makedirs("/home/agiintern/regions/log/rule_log/varcomp_ww", exist_ok = True)
-os.makedirs("/home/agiintern/regions/log/rule_log/varcomp_ww/sample", exist_ok = True)
-
-configfile: "source_functions/config/varcomp_ww.yaml"
+configfile: "source_functions/config/aireml_varcomp.config.yaml"
 
 rule all:
     input:
-     expand("data/derived_data/varcomp_ww/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log", iter = config['iter'], dataset = config['dataset']), expand("data/derived_data/varcomp_ww/iter{iter}/genotypes.iter{iter}.txt", iter = config['iter'])
+     expand("data/derived_data/aireml_varcomp/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log", iter = config['iter'], dataset = config['dataset'])
 
-# Format map file for BLUPF90
-rule format_map:
-    input:
-        master_map = config['master_map']
-    output:
-        format_map = "data/derived_data/chrinfo.50k.txt"
-    shell:
-        """
-        awk '{{print $5, $2, $3, $4}}' {input.master_map} &> {output.format_map}
-        """
-
-# Create sample datasets
-rule sample:
+rule setup_par:
     resources:
-        load = 40
+        load = 1
     input:
-        fun_three_gen = "source_functions/three_gen.R",
-        fun_sample_until = "source_functions/sample_until.R",
-        fun_ped = "source_functions/ped.R",
-        fun_write_data = "source_functions/write_tworegion_data.R",
-        region_key = "source_functions/region_key.R",
-        script = "source_functions/varcomp_ww_start.R",
-        ww_data = "data/derived_data/varcomp_ww/ww_data.rds",
-        ped = "data/derived_data/import_regions/ped.rds"
+        last_solutions = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/last_solutions",
+        base_par = "source_functions/par/aireml_varcomp.par",
+        script = "source_functions/setup.aireml_varcomp.R",
+        postmean = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/postmean"
     params:
-        iter = "{iter}"
+        iter = "{iter}",
+        dataset = "{dataset}",
+        rule_log = "log/rule_log/aireml_varcomp/setup_par/setup_par.iter{iter}.{dataset}.log"
     output:
-        datafile = expand("data/derived_data/varcomp_ww/iter{{iter}}/{dataset}/data.txt", dataset = config['dataset']),
-        pedfile = expand("data/derived_data/varcomp_ww/iter{{iter}}/{dataset}/ped.txt", dataset = config['dataset']),
-        pull_list = "data/derived_data/varcomp_ww/iter{iter}/pull_list.txt",
-        summary = "data/derived_data/varcomp_ww/iter{iter}/varcomp_ww.data_summary.iter{iter}.csv"
+        par = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/aireml_varcomp.par"
     shell:
-        "Rscript --vanilla {input.script} {params.iter} &> log/rule_log/varcomp_ww/sample/sample.iter{params.iter}.log"
+        "Rscript --vanilla {input.script} {params.iter} {params.dataset} &> {params.rule_log}"
 
 # Copy par file for tworegion datasets
-rule copy_par:
+rule copy_data:
     resources:
         load = 20
     input:
-        in_par = "source_functions/par/varcomp_ww.tworegion.par"
+        ped = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/ped.txt",
+        data = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/data.txt"
     output:
-        out_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/varcomp_ww.par"
-    shell:
-        "cp {input.in_par} {output.out_par}"
-
-# Left join genotypes in master genotype file to list of genotyped animals to be used
-rule pull_genotypes:
-    resources:
-        load = 30
-    input:
-        pullfile = "data/derived_data/varcomp_ww/iter{iter}/pull_list.txt"
-    params:
-        master_geno = config['master_geno']
-    output:
-        reduced_geno = "data/derived_data/varcomp_ww/iter{iter}/genotypes.iter{iter}.txt"
+        ped = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/ped.txt",
+        data = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/data.txt"
     shell:
         """
-        grep -Fwf {input.pullfile} {params.master_geno} | awk '{{printf "%-25s %s\\n", $1, $2}}' &> {output.reduced_geno}
+        cp {input.ped} {output.ped}
+        cp {input.data} {output.data}
         """
 
 rule renf90:
     resources:
         load = 20
     input:
-        in_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/varcomp_ww.par",
-        datafile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/data.txt",
-        pedfile = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/ped.txt"
+        par = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/aireml_varcomp.par",
+        data = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/data.txt",
+        ped = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/ped.txt"
     params:
         renumf90_path = config['renumf90_path'],
-        directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
+        directory = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}",
         renum_out = "renf90.iter{iter}.{dataset}.out"
     output:
-        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par"
+        renum_par = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/renf90.par"
     shell:
         """
         cd {params.directory}
-        {params.renumf90_path} varcomp_ww.par &> {params.renum_out}
+        {params.renumf90_path} aireml_varcomp.par &> {params.renum_out}
         """
 
 rule aireml:
     resources:
-        load = lambda wildcards: config['resources_key'][wildcards.dataset]
+        load = 50
     input:
-        renum_par = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/renf90.par"
+        renum_par = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/renf90.par"
     params:
         aireml_path = config['airemlf90_path'],
-        directory = "data/derived_data/varcomp_ww/iter{iter}/{dataset}",
+        directory = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}",
         aireml_out = "aireml.iter{iter}.{dataset}.out",
         aireml_renamed = "airemlf90.iter{iter}.{dataset}.log"
     output:
-        aireml_renamed = "data/derived_data/varcomp_ww/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log"
+        aireml_renamed = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log"
     shell:
         """
         cd {params.directory}
