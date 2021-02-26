@@ -49,15 +49,19 @@ Then after filtration, removed:
 
 ## Genetic correlations between regions
 
-### Sampling
+### Data sampling
 
 * In `source_functions/setup.gibbs_varcomp.R`
 * Remove records from dams with calves in both the High Plains and one of the other regions (to avoid between-region MPE covariance issues)
 * For 5 separate iterations, sample 50,000 +/- 500 records by zip code from the High Plains and each of the 6 other comparison ecoregions
 
-### Gibbs sampling
+### Variance components estimation
 
 * BLUPF90 Gibbs sampling ran in `source_functions/gibbs_varcomp.snakefile`
   * 1,000,000 total samples with burn in of 50,000 samples and every 100th sample retained
 * Post-Gibbs analysis ran in `source_functions/post_gibbs.snakefile` and evaluated in `notebooks/post_gibbs.Rmd`
 * Variance component estimation results in `notebooks/gibbs_varcomp.Rmd`
+
+## GWAS
+
+* For each comparison region, extract 

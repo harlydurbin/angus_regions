@@ -39,7 +39,7 @@ read_gibbs_mce <- function(iteration, region) {
                                              param == "14" ~ "r2r2"),
                     iter = iteration,
                     dataset = glue::glue("3v{region}")) %>% 
-      dplyr::mutate_at(vars(contains("hpd"), "effective_sample_size"), ~ abs(.))
+      dplyr::mutate(effective_sample_size = abs(effective_sample_size))
     
   }
   

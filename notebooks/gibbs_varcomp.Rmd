@@ -21,7 +21,7 @@ library(purrr)
 library(ggplot2)
 library(stringr)
 
-complete_samples <- 9500
+complete_samples <- 8897
 
 source(here::here("source_functions/calculate_heritability.R"))
 source(here::here("source_functions/read_gibbs.R"))
@@ -113,13 +113,49 @@ gibbs_h2 <-
 gibbs_h2 %>% 
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>% 
-  select(Comparison = key, Iteration = iter, everything(), -n_samples) %>% 
+  select(Comparison = key, Iteration = iter, everything(), -n_samples) %>%
   arrange(Comparison, Iteration)
 ```
 
+## $h^2_D$
+
+```{r}
+gibbs_h2 %>% 
+  group_by(key) %>% 
+  summarise(`Min h2D` = min(`Direct h2`),
+            `Mean h2D` = mean(`Direct h2`),
+            `Max h2D` = max(`Direct h2`),
+            n = n())
+  
+``` 
+
+## $h^2_M$
+
+```{r}
+gibbs_h2 %>% 
+  group_by(key) %>% 
+  summarise(`Min h2M` = min(`Maternal h2`),
+            `Mean h2M` = mean(`Maternal h2`),
+            `Max h2M` = max(`Maternal h2`),
+            n = n())
+  
+``` 
+
+## $c^2$
+
+```{r}
+gibbs_h2 %>% 
+  group_by(key) %>% 
+  summarise(`Min c2` = min(`MPE c2`),
+            `Mean c2` = mean(`MPE c2`),
+            `Max c2` = max(`MPE c2`),
+            n = n())
+  
+``` 
+
 # Genetic correlations
 
-## Direct effect, High Plains vs. other
+## HP direct & other direct
 
 ```{r}
 gibbs_corr %>% 
@@ -155,7 +191,7 @@ gibbs_corr %>%
             SD = sd(Correlation))
 ```
 
-## Maternal effect, High Plains vs. other
+## HP maternal & other maternal
 
 ```{r}
 gibbs_corr %>% 
@@ -176,6 +212,51 @@ gibbs_corr %>%
 gibbs_corr %>% 
   filter(str_detect(val1, "3_mat")) %>% 
   filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
+  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>%
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>%
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  group_by(Comparison) %>% 
+  summarise(`Min.` = min(Correlation),
+            Mean = mean(Correlation),
+            `Max.` = max(Correlation),
+            SD = sd(Correlation))
+```
+
+## HP direct & other maternal
+
+```{r}
+gibbs_corr %>% 
+  filter(str_detect(val1, "3_dir")) %>% 
+  filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
+  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>%
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>%
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  group_by(Comparison) %>% 
+  summarise(`Min.` = min(Correlation),
+            Mean = mean(Correlation),
+            `Max.` = max(Correlation),
+            SD = sd(Correlation))
+```
+
+## Within-region direct & maternal
+
+```{r}
+gibbs_corr %>% 
+  mutate(val1r = str_extract(val1, "^[[:digit:]]{1}"),
+         val2r = str_extract(val2, "^[[:digit:]]{1}")) %>% 
+  filter(val1r == val2r) %>% 
+  filter(str_detect(val1, "dir")) %>% 
+  filter(str_detect(val2, "mat")) %>% 
   mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>%
