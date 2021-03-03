@@ -75,20 +75,20 @@ gibbs_samples <-
   purrr::set_names("iter", "dataset", "round", c(1:14)) %>% 
   tidyr::pivot_longer(cols = c(`1`:`14`),
                       names_to = "param") %>% 
-  mutate(param = case_when(param == "1" ~ "d1d1",
-                           param == "2" ~ "d1d2",
-                           param == "3" ~ "d1m1",
-                           param == "4" ~ "d1m2",
-                           param == "5" ~ "d2d2",
-                           param == "6" ~ "d2m1",
-                           param == "7" ~ "d2m2",
-                           param == "8" ~ "m1m1",
-                           param == "9" ~ "m1m2",
-                           param == "10" ~ "m2m2",
+  mutate(param = case_when(param == "1" ~ "dir1dir1",
+                           param == "2" ~ "dir1dir2",
+                           param == "3" ~ "dir1mat1",
+                           param == "4" ~ "dir1mat2",
+                           param == "5" ~ "dir2dir2",
+                           param == "6" ~ "dir2mat1",
+                           param == "7" ~ "dir2mat2",
+                           param == "8" ~ "mat1mat1",
+                           param == "9" ~ "mat1mat2",
+                           param == "10" ~ "mat2mat2",
                            param == "11" ~ "mpe1mpe1",
                            param == "12" ~ "mpe2mpe2",
-                           param == "13" ~ "r1r1",
-                           param == "14" ~ "r2r2"),
+                           param == "13" ~ "res1res1",
+                           param == "14" ~ "res2res2"),
          iter = as.character(iter))
   
 ``` 
@@ -175,7 +175,7 @@ gibbs_psd %>%
 plot_gibbs_iter <-
   function(df) {
     df %>% 
-      filter(!stringr::str_detect(param, "r|mpe")) %>% 
+      filter(!stringr::str_detect(param, "res|mpe")) %>% 
       ggplot(aes(x = round,
                  y = value,
                  color = param)) +

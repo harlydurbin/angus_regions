@@ -20,8 +20,10 @@ library(tibble)
 library(purrr)
 library(ggplot2)
 library(stringr)
+library(rlang)
+library(coda)
 
-complete_samples <- 8897
+complete_samples <- 9500
 
 source(here::here("source_functions/calculate_heritability.R"))
 source(here::here("source_functions/read_gibbs.R"))
@@ -45,20 +47,20 @@ gibbs_samples <-
   purrr::set_names("iter", "dataset", "round", c(1:14)) %>% 
   tidyr::pivot_longer(cols = c(`1`:`14`),
                       names_to = "param") %>% 
-  mutate(param = case_when(param == "1" ~ "d1d1",
-                           param == "2" ~ "d1d2",
-                           param == "3" ~ "d1m1",
-                           param == "4" ~ "d1m2",
-                           param == "5" ~ "d2d2",
-                           param == "6" ~ "d2m1",
-                           param == "7" ~ "d2m2",
-                           param == "8" ~ "m1m1",
-                           param == "9" ~ "m1m2",
-                           param == "10" ~ "m2m2",
+  mutate(param = case_when(param == "1" ~ "dir1dir1",
+                           param == "2" ~ "dir1dir2",
+                           param == "3" ~ "dir1mat1",
+                           param == "4" ~ "dir1mat2",
+                           param == "5" ~ "dir2dir2",
+                           param == "6" ~ "dir2mat1",
+                           param == "7" ~ "dir2mat2",
+                           param == "8" ~ "mat1mat1",
+                           param == "9" ~ "mat1mat2",
+                           param == "10" ~ "mat2mat2",
                            param == "11" ~ "mpe1mpe1",
                            param == "12" ~ "mpe2mpe2",
-                           param == "13" ~ "r1r1",
-                           param == "14" ~ "r2r2"),
+                           param == "13" ~ "res1res1",
+                           param == "14" ~ "res2res2"),
          iter = as.character(iter))
   
 ``` 
@@ -107,6 +109,89 @@ gibbs_h2 <-
                     mutate(dataset = glue("3v{.y}"))) 
 ```
 
+```{r}
+h2_sample <-
+  gibbs_samples %>% 
+  tidyr::pivot_wider(id_cols = c("iter", "dataset", "round"),
+                     names_from = param,
+                     values_from = value) %>% 
+  # This is janky but it's a lot faster 
+  mutate(# maternal h2
+         mat1h2 = (mat1mat1/(dir1dir1+dir1mat1+mat1mat1+mpe1mpe1+res1res1)),
+         mat2h2 = (mat2mat2/(dir2dir2+dir2mat2+mat2mat2+mpe2mpe2+res2res2)),
+         # direct h2
+         dir1h2 = (dir1dir1/(dir1dir1+dir1mat1+mat1mat1+mpe1mpe1+res1res1)),
+         dir2h2 = (dir2dir2/(dir2dir2+dir2mat2+mat2mat2+mpe2mpe2+res2res2)),
+         mpe1c2 = (mpe1mpe1/(dir1dir1+dir1mat1+mat1mat1+mpe1mpe1+res1res1)),
+         # mpe c2
+         mpe2c2 = (mpe2mpe2/(dir2dir2+dir2mat2+mat2mat2+mpe2mpe2+res2res2))) %>% 
+  select(iter, dataset, round, mat1h2, mat2h2, dir1h2, dir2h2, mpe1c2, mpe2c2)
+```
+
+```{r}
+rg_sample <-
+  gibbs_samples %>% 
+  tidyr::pivot_wider(id_cols = c("iter", "dataset", "round"),
+                     names_from = param,
+                     values_from = value) %>% 
+  # This is janky but it's a lot faster 
+  mutate(# HP dir-other dir
+         rgdir1dir2 = (dir1dir2/(sqrt(dir1dir1*dir2dir2))),
+         # HP mat-other mat
+         rgmat1mat2 = (mat1mat2/(sqrt(mat1mat1*mat2mat2))),
+         # HP dir-other mat
+         rgdir1mat2 = (dir1mat2/(sqrt(dir1dir1*mat2mat2))),
+         # dir-mat within region
+         rgdir2mat2 = (dir2mat2/(sqrt(dir2dir2*mat2mat2))),
+         rgdir1mat1 = (dir1mat1/(sqrt(dir1dir1*mat1mat1)))) %>% 
+  select(iter, dataset, round, starts_with("rg"))
+```
+
+```{r}
+plot_dist_grid <-
+  function(df, var) {
+    var <- rlang::enquo(var)
+    
+    df %>% 
+      mutate(iter = glue("Iteration {iter}"),
+             num = as.numeric(str_extract(dataset, "(?<=3v)[[:digit:]]"))) %>% 
+      left_join(region_key) %>% 
+      ggplot(aes(x = !!var,
+                 fill = color1)) +
+      geom_density() +
+      theme_classic() +
+      scale_fill_identity() +
+      labs(x = "Estimate", 
+           y = "Kernel density") +
+      facet_grid(rows = vars(iter),
+                 cols = vars(desc))
+  }
+```
+
+```{r}
+hpd <-
+  h2_sample %>% 
+  left_join(rg_sample) %>% 
+  tidyr::pivot_longer(cols = -one_of("iter", "dataset", "round")) %>% 
+  group_by(iter, dataset, name) %>% 
+  tidyr::nest() %>% 
+  ungroup() %>% 
+  mutate(value = purrr::map(.x = data,
+                            ~ .x %>% 
+                              pull(value)),
+         hpd_int = purrr::map(.x = value, 
+                              ~ .x %>% 
+                                coda::as.mcmc() %>% 
+                                coda::HPDinterval()),
+         hpd_lower = purrr::map_dbl(.x = hpd_int,
+                                    ~ .x %>% 
+                                      pluck(1)),
+         hpd_upper = purrr::map_dbl(.x = hpd_int,
+                                    ~ .x %>% 
+                                      pluck(2))) %>% 
+  select(-data, -value, -hpd_int, param = name, everything())
+```
+
 # Heritabilities
 
 ```{r}
@@ -129,6 +214,12 @@ gibbs_h2 %>%
   
 ``` 
 
+### Distribution 
+
+```{r, fig.width=12, fig.height=8}
+plot_dist_grid(df = h2_sample, var = dir2h2)
+```
+
 ## $h^2_M$
 
 ```{r}
@@ -141,6 +232,12 @@ gibbs_h2 %>%
   
 ``` 
 
+### Distribution 
+
+```{r, fig.width=12, fig.height=8}
+plot_dist_grid(df = h2_sample, var = mat2h2)
+```
+
 ## $c^2$
 
 ```{r}
@@ -152,6 +249,12 @@ gibbs_h2 %>%
             n = n())
   
 ``` 
+
+### Distribution 
+
+```{r, fig.width=12, fig.height=8}
+plot_dist_grid(df = h2_sample, var = mpe2c2)
+```
 
 # Genetic correlations
 
@@ -191,6 +294,12 @@ gibbs_corr %>%
             SD = sd(Correlation))
 ```
 
+### Distribution 
+
+```{r, fig.width=12, fig.height=8}
+plot_dist_grid(df = rg_sample, var = rgdir1dir2)
+```
+
 ## HP maternal & other maternal
 
 ```{r}
@@ -227,6 +336,12 @@ gibbs_corr %>%
             SD = sd(Correlation))
 ```
 
+### Distribution 
+
+```{r, fig.width=12, fig.height=8}
+plot_dist_grid(df = rg_sample, var = rgmat1mat2)
+```
+
 ## HP direct & other maternal
 
 ```{r}
@@ -246,6 +361,12 @@ gibbs_corr %>%
             Mean = mean(Correlation),
             `Max.` = max(Correlation),
             SD = sd(Correlation))
+```
+
+### Distribution 
+
+```{r, fig.width=12, fig.height=8}
+plot_dist_grid(df = rg_sample, var = rgdir1mat2)
 ```
 
 ## Within-region direct & maternal
@@ -271,3 +392,11 @@ gibbs_corr %>%
             `Max.` = max(Correlation),
             SD = sd(Correlation))
 ```
+
+### Distribution 
+
+```{r, fig.width=12, fig.height=8}
+plot_dist_grid(df = rg_sample, var = rgdir2mat2)
+```
+
+# Commentary

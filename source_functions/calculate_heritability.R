@@ -19,19 +19,20 @@ biv_heritability <-
       df %>%
       mutate(key = case_when(stringr::str_detect(val1, r1_abbrv) ~ r1_desc,
                              stringr::str_detect(val1, r2_abbrv) ~ r2_desc),
-              # Direct/maternal covariance
-              val1 =
-                case_when(val1 == glue::glue("{r1_abbrv}_dir") &
-                            val2 == glue::glue("{r1_abbrv}_mat") ~
-                            glue::glue("{r1_abbrv}_dir_mat"),
-                          val1 == glue::glue("{r2_abbrv}_dir") &
-                            val2 == glue::glue("{r2_abbrv}_mat") ~
-                            glue::glue("{r2_abbrv}_dir_mat"),
-                          TRUE ~ val1),
-              val2 = if_else(stringr::str_detect(val1,
+             # Direct/maternal covariance
+             # If val1 is dir & val2 is mat, rename val1 to dir_mat
+             val1 = case_when(val1 == glue::glue("{r1_abbrv}_dir") &
+                                val2 == glue::glue("{r1_abbrv}_mat") ~ 
+                                glue::glue("{r1_abbrv}_dir_mat"),
+                              val1 == glue::glue("{r2_abbrv}_dir") &
+                                val2 == glue::glue("{r2_abbrv}_mat") ~ 
+                                glue::glue("{r2_abbrv}_dir_mat"),
+                              TRUE ~ val1),
+             val2 = if_else(stringr::str_detect(val1,
                                                  "dir_mat"),
                              val1,
                              val2)) %>%
+      # Keep only variances + dir_mat covariance
       filter(val1 == val2) %>%
       select(-val2) %>%
       # Pivot to wide format
