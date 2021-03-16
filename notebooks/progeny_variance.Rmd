@@ -18,7 +18,6 @@ library(glue)
 library(ggplot2)
 library(forcats)
 library(magrittr)
-library(tidylog)
 
 source(here::here("source_functions/region_key.R"))
 
@@ -39,9 +38,7 @@ reg_region <-
   readr::read_rds(here::here("data/derived_data/import_regions/reg_region.rds"))
 ```
 
-* Summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
-* Remove region/sire combinations with only one unique contemporary group
-* Remove region/sire combinations with fewer than 50 calves
+## 1. Tally number of calves per region for each unique sire
 
 ```{r sire_tally}
 sire_tally <- 
@@ -58,10 +55,7 @@ sire_tally <-
   filter(n_cg > 1) %>% 
   # Discard rows where sire has fewer than 50 calves in the region
   filter(n >= 50) 
-  
 ```
-
-* For each sire, compare each retained region with each other retained region (with swap duplicates)
 
 ```{r sire_pair}
 
@@ -89,7 +83,12 @@ sire_pair <-
 
 ```
 
-* For each sire, compare the median of his calves in selected region against mean of all his calves retained
+* Summarize number of calves in each region by each sire, number of contemporary groups in each region with calf by each sire, mean weaning weight of calves in each region by each sire
+* Remove region/sire combinations with only one unique contemporary group
+* Remove region/sire combinations with fewer than 50 calves
+* **Number of passing sires = `r sire_pair %>% distinct(sire_reg) %>% pull(sire_reg) %>% length() %>% scales::comma()`**
+
+## 2. For each sire, compare the median of his calves in selected region against mean of all his calves retained
 
 ```{r baseline_change}
 
@@ -102,13 +101,12 @@ baseline_change <-
               summarise(median_overall = median(weight)) %>% 
               ungroup()) %>% 
   mutate(change = median_v1 - median_overall)
-
   
 ```
 
 # Basic data summary
 
-* Number of regions passing criteria per sire. What percentage of sires have 2-7 regions?
+## Number of regions passing criteria per sire. What percentage of sires have 2-7 regions?
 
 ```{r pct_per_region}
 sire_pair %>% 
@@ -126,9 +124,11 @@ sire_pair %>%
   mutate(percent = n_sires/sum(n_sires))
 ```
 
+* **Median number of passing regions per sire is `rsire_pair %>% select(sire_reg, V1, V2) %>% tidyr::pivot_longer(cols = c("V1", "V2")) %>% select(-name) %>% distinct() %>% group_by(sire_reg) %>% summarise(n = n_distinct(value)) %>% ungroup() %>% summarise(median(n)) %>% pull(`median(n)`)`**
+
 # Comparing sire performance against its own baseline
 
-How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves?
+## How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves?
 
 ```{r}
 baseline_change %>% 
@@ -138,7 +138,7 @@ baseline_change %>%
 
 ```
 
-Which regions most often fall far below sire baseline?
+## Which regions most often fall far below sire baseline?
 
 ```{r}
 
@@ -151,7 +151,7 @@ baseline_change %>%
 
 ```
 
-```{r}
+```{r, eval = FALSE}
 baseline_change %>% 
   summarise(max(median_v1),
             max(median_overall),
@@ -197,27 +197,44 @@ baseline_change  %>%
 
 # Inter-region spread
 
-* What is the distribution of across-region spread? 
+## What is the distribution of across-region spread? 
 
 ```{r}
-baseline_change %>% 
+ir_spread <-
+  baseline_change %>% 
   group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   ungroup() %>% 
-  summarise(median_spread = median(spread),
-            min_spread = min(spread),
-            max_spread = max(spread),
-            sd_spread = sd(spread))
+  summarise(`Median spread` = median(spread),
+            `Min. spread` = min(spread),
+            `Max. spread` = max(spread),
+            `SD spread` = sd(spread))
 ```
 
-* How many sires with spread greater than 3 SD above the median?
+```{r}
+ir_med <- 
+  ir_spread %>% 
+  pull(`Median spread`)
+```
+
+```{r}
+ir_sd <-
+  ir_spread %>% 
+  pull(`SD spread`)
+```
+
+```{r}
+ir_spread
+```
+
+## How many sires with spread greater than 3 SD above the median?
 
 ```{r}
 baseline_change %>% 
   group_by(sire_reg) %>% 
   summarise(spread = max(median_v1)-min(median_v1)) %>% 
   ungroup() %>% 
-  filter(spread >= 17.9169+(10.89403*3)) %>% 
+  filter(spread >= ir_med+(ir_sd*3)) %>% 
   arrange(desc(spread))
 ```
 
@@ -247,47 +264,18 @@ baseline_change %>%
 
 ```
 
-```{r, eval=FALSE}
-
-test <-
-  baseline_change %>% 
-  group_by(sire_reg) %>% 
-  summarise(spread = max(median_v1)-min(median_v1)) %>% 
-  arrange(desc(spread)) %>% 
-  left_join(reg_region %>% 
-              select(region, sire_reg = full_reg))
-
-```
-
-```{r, eval=FALSE}
-test %>% 
-  rename(home_region = region) %>% 
-  ggplot(aes(x = spread)) +
-  geom_histogram() +
-  facet_wrap(~ home_region)
-```
-
 # Compare sire performance in High Plains against performance in every other region
 
-* How many sires pass criteria in the HP?
+* **`r sire_pair %>% filter(V2 == 3) %>% distinct(sire_reg) %>% pull(sire_reg) %>% length() %>% scales::comma()` sires pass criteria in the High Plains**
 
 ```{r}
-sire_pair %>% 
-  filter(V2 == 3) %>% 
-  distinct(sire_reg)
-
-```
-
-* Recreate `baseline_change` using High Plains as the "baseline"
-
-```{r}
-
+# Recreate `baseline_change` using High Plains as the "baseline"
 hp_change <-
   sire_pair %>% 
   filter(V1 == 3)
 ```
 
-* How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves in the High Plains?
+## How many sires with region where calves are at least 20 kg lighter than the overall median weight of their calves in the High Plains?
 
 ```{r}
 hp_change %>% 
@@ -297,7 +285,7 @@ hp_change %>%
 
 ```
 
-* Which regions most often fall far below the High Plains baseline?
+## Which regions most often fall far below the High Plains baseline?
 
 ```{r}
 
