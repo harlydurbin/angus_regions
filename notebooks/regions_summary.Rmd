@@ -76,13 +76,13 @@ animal_regions %>%
   arrange(Region)
 ```
 
-```{r ww_sample_map, fig.width=8.76, fig.height=5.4, eval=FALSE}
+```{r ww_sample_map, fig.width=8.76, fig.height=5.4, eval=TRUE}
 source(here::here("source_functions/samples_map.R"))
 
 samples_map
 ```
 
-```{r export_sample_map, fig.width=8.76, fig.height=5.4, eval=FALSE}
+```{r export_sample_map, fig.width=8.76, fig.height=5.4, eval=TRUE}
 ggsave(filename = here::here("figures/regions_summary/sample_map.png"), width = 8.76, height = 5.4)
 
 ```
@@ -105,7 +105,9 @@ multi_dam %>%
   group_by(dam_reg) %>% 
   tally(sort = TRUE,
         name = "N regions") %>% 
-  rename(`Dam registration number` = dam_reg)
+  ungroup() %>% 
+  group_by(`N regions`) %>% 
+  tally(name = "N dams")
   
 ```
 
@@ -117,7 +119,8 @@ multi_dam %>%
                      names_from = region,
                      values_from = n) %>% 
   filter(!is.na(`3`)) %>% 
-  select(`Dam registration number` = dam_reg)
+  select(`Dam registration number` = dam_reg) %>% 
+  tally()
 ```
 
 * What percentage of records come from calves of dams with calves in region 3 + another region?
@@ -199,11 +202,11 @@ animal_regions %>%
   summarise(weight = mean(weight)) %>% 
   ungroup() %>% 
   solutions_boxswarm(effect_var = weight,
-                     y_title = "Adjusted weaning weight (kg)") +
-  guides(color = FALSE) +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.title.x = element_blank())
+                     y_title = "Adjusted weaning weight (kg)")
+```
+
+```{r save_pheno_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
+ggsave(here::here("figures/regions_summary/ww_pheno.solutions_boxswarm.png"), width = 8.76, height = 5.4)
 ```
 
 ## Contemporary group solutions
@@ -211,48 +214,44 @@ animal_regions %>%
 ```{r cg_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
 cg_regions %>% 
   solutions_boxswarm(effect_var = cg_sol,
-                     y_title = "Contemporary group BLUE (kg)") +
-  guides(color = FALSE) +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.title.x = element_blank())
+                     y_title = "Contemporary group BLUE (kg)")
 ```
 
-```{r ww_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
+```{r save_cg_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
 ggsave(here::here("figures/regions_summary/ww_cg.solutions_boxswarm.png"), width = 8.76, height = 5.4)
 ```
 
 ### Direct breeding values
 
-```{r bv_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
+```{r dir_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
 
 animal_regions %>%
   group_by(cg_new, region) %>% 
   summarise(bv_sol = mean(bv_sol)) %>% 
   ungroup() %>% 
   solutions_boxswarm(effect_var = bv_sol,
-                     y_title = "Direct effect EBV") +
-  guides(color = FALSE) +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.title.x = element_blank())
+                     y_title = "Direct effect EBV")
 
+```
+
+```{r save_dir_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
+ggsave(here::here("figures/regions_summary/ww_dir.solutions_boxswarm.png"), width = 8.76, height = 5.4)
 ```
 
 ## Maternal breeding values
 
-```{r ww_mat, fig.width=8.76, fig.height=5.4, echo = FALSE}
+```{r mat_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
 
 animal_regions %>%
   group_by(cg_new, region) %>% 
   summarise(mat_sol = mean(mat_sol)) %>% 
   ungroup() %>% 
   solutions_boxswarm(effect_var = mat_sol,
-                     y_title = "Maternal effect EBV") +
-  guides(color = FALSE) +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.title.x = element_blank())
+                     y_title = "Maternal effect EBV")
+```
+
+```{r save_mat_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
+ggsave(here::here("figures/regions_summary/ww_mat.solutions_boxswarm.png"), width = 8.76, height = 5.4)
 ```
 
 # Commentary
