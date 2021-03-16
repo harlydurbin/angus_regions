@@ -5,6 +5,7 @@ output:
   html_document:
     toc: true
     toc_depth: 2
+    toc_float: true
     df_print: paged
     code_folding: hide 
 ---
@@ -124,7 +125,7 @@ sire_pair %>%
   mutate(percent = n_sires/sum(n_sires))
 ```
 
-* **Median number of passing regions per sire is `rsire_pair %>% select(sire_reg, V1, V2) %>% tidyr::pivot_longer(cols = c("V1", "V2")) %>% select(-name) %>% distinct() %>% group_by(sire_reg) %>% summarise(n = n_distinct(value)) %>% ungroup() %>% summarise(median(n)) %>% pull(`median(n)`)`**
+* **Median number of passing regions per sire is `r sire_pair %>% select(sire_reg, V1, V2) %>% tidyr::pivot_longer(cols = c("V1", "V2")) %>% select(-name) %>% distinct() %>% group_by(sire_reg) %>% summarise(n = n_distinct(value)) %>% ungroup() %>% summarise(m = median(n)) %>% pull(m)`**
 
 # Comparing sire performance against its own baseline
 
