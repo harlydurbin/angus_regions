@@ -221,7 +221,7 @@ cg_regions %>%
 ggsave(here::here("figures/regions_summary/ww_cg.solutions_boxswarm.png"), width = 8.76, height = 5.4)
 ```
 
-### Direct breeding values
+## Direct breeding values
 
 ```{r dir_swarm, fig.width=8.76, fig.height=5.4, echo = FALSE}
 
