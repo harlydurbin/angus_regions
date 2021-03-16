@@ -189,7 +189,21 @@ hpd <-
          hpd_upper = purrr::map_dbl(.x = hpd_int,
                                     ~ .x %>% 
                                       pluck(2))) %>% 
-  select(-data, -value, -hpd_int, param = name, everything())
+  select(param = name, everything(), -data, -value, -hpd_int)
+```
+
+```{r}
+pivot_hpd <-
+  function(which) {
+    hpd %>% 
+      filter(param == which) %>% 
+      mutate(diff = abs(hpd_upper-hpd_lower),
+             int = as.character(glue("{round(hpd_lower, digits = 3)}, {round(hpd_upper, digits = 3)} ({round(diff, digits = 3)})")),
+             iter = as.character(glue("Iteration {iter}"))) %>% 
+      select(iter, Dataset = dataset, int) %>% 
+      tidyr::pivot_wider(names_from = iter,
+                         values_from = int)
+  }
 ```
 
 # Heritabilities
@@ -220,6 +234,12 @@ gibbs_h2 %>%
 plot_dist_grid(df = h2_sample, var = dir2h2)
 ```
 
+### HPD interval
+
+```{r}
+pivot_hpd("dir2h2")
+```
+
 ## $h^2_M$
 
 ```{r}
@@ -238,6 +258,12 @@ gibbs_h2 %>%
 plot_dist_grid(df = h2_sample, var = mat2h2)
 ```
 
+### HPD interval
+
+```{r}
+pivot_hpd("mat2h2")
+```
+
 ## $c^2$
 
 ```{r}
@@ -254,6 +280,12 @@ gibbs_h2 %>%
 
 ```{r, fig.width=12, fig.height=8}
 plot_dist_grid(df = h2_sample, var = mpe2c2)
+```
+
+### HPD interval
+
+```{r}
+pivot_hpd("mpe2c2")
 ```
 
 # Genetic correlations
@@ -300,6 +332,12 @@ gibbs_corr %>%
 plot_dist_grid(df = rg_sample, var = rgdir1dir2)
 ```
 
+### HPD interval
+
+```{r}
+pivot_hpd("rgdir1dir2")
+```
+
 ## HP maternal & other maternal
 
 ```{r}
@@ -342,6 +380,12 @@ gibbs_corr %>%
 plot_dist_grid(df = rg_sample, var = rgmat1mat2)
 ```
 
+### HPD interval
+
+```{r}
+pivot_hpd("rgmat1mat2")
+```
+
 ## HP direct & other maternal
 
 ```{r}
@@ -367,6 +411,12 @@ gibbs_corr %>%
 
 ```{r, fig.width=12, fig.height=8}
 plot_dist_grid(df = rg_sample, var = rgdir1mat2)
+```
+
+### HPD interval
+
+```{r}
+pivot_hpd("rgdir1mat2")
 ```
 
 ## Within-region direct & maternal
@@ -397,6 +447,12 @@ gibbs_corr %>%
 
 ```{r, fig.width=12, fig.height=8}
 plot_dist_grid(df = rg_sample, var = rgdir2mat2)
+```
+
+### HPD interval
+
+```{r}
+pivot_hpd("rgdir2mat2")
 ```
 
 # Commentary
