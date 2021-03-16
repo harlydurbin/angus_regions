@@ -9,6 +9,5 @@
 data/*
 source_functions/bivariate_setup/*
 source_functions/Metasoft/*
-html/*
 *.csv
 *.txt
