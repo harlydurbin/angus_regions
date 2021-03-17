@@ -2,6 +2,8 @@ renumf90_path: '~/bin/renumf90'
 
 airemlf90_path: '~/bin/airemlf90'
 
-iter: ['4', '5']
+iter: ['1', '2', '3', '4', '5']
 
 dataset: ['3v1', '3v2', '3v5', '3v7', '3v8', '3v9']
+
+aireml_threads: 8

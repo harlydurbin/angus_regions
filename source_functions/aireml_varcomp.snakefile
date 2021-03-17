@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/aireml_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 30 --resources load=200 -j 24 --config &> log/snakemake_log/aireml_varcomp/210225.aireml_varcomp.log &
+# nohup snakemake -s source_functions/aireml_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 30 --resources load=100 -j 24 --config &> log/snakemake_log/aireml_varcomp/210317.aireml_varcomp.log &
 
 configfile: "source_functions/config/aireml_varcomp.config.yaml"
 
@@ -8,7 +8,7 @@ rule all:
 
 rule setup_par:
     resources:
-        load = 1
+        load = 10
     input:
         last_solutions = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/last_solutions",
         base_par = "source_functions/par/aireml_varcomp.par",
@@ -67,13 +67,14 @@ rule aireml:
         aireml_path = config['airemlf90_path'],
         directory = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}",
         aireml_out = "aireml.iter{iter}.{dataset}.out",
-        aireml_renamed = "airemlf90.iter{iter}.{dataset}.log"
+        aireml_renamed = "airemlf90.iter{iter}.{dataset}.log",
+        aireml_threads = config['aireml_threads']
     output:
         aireml_renamed = "data/derived_data/aireml_varcomp/iter{iter}/{dataset}/airemlf90.iter{iter}.{dataset}.log"
     shell:
         """
         cd {params.directory}
-        export OMP_NUM_THREADS=6
+        export OMP_NUM_THREADS={params.aireml_threads}
         {params.aireml_path} renf90.par &> {params.aireml_out}
         mv airemlf90.log {params.aireml_renamed}
         """
