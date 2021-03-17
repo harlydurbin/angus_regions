@@ -52,11 +52,25 @@ animal_regions %<>%
   # Re-filter for contemporary group size
   group_by(cg_new) %>%
   filter(n() >= 5) %>%
-  ungroup()
+  ungroup() %>% 
+  mutate(region = as.character(region))
+
+# "Master" High Plains zips
+
+master_zips <-
+  animal_regions %>% 
+  filter(region == 3) %>% 
+  sample_until(limit = sample_limit,
+               tolerance = 500,
+               var = zip,
+               id_var = unique(.$region)) %>% 
+  mutate(region = as.character(id)) %>% 
+  select(-id)
 
 ## -----------------------------------------------------------------------------
 keep_zips <-
   animal_regions %>%
+  filter(!zip %in% master_zips$zip) %>% 
   group_by(region) %>%
   group_map(~ sample_until(.x,
                            # Changed to 50,000 on 9/25/20
@@ -67,24 +81,32 @@ keep_zips <-
               ungroup(),
             keep = TRUE) %>%
   reduce(bind_rows) %>%
-  rename(region = id)
+  rename(region = id) %>% 
+  mutate(region = if_else(region == 3, "3alt", as.character(region)))
 
+# Bind "master" High Plains zips
+
+keep_zips %<>% 
+  bind_rows(master_zips)
+  
 ## -----------------------------------------------------------------------------
 iter_data <-
-  animal_regions %>%
-  filter(zip %in% keep_zips$zip)
+  keep_zips %>% 
+  left_join(animal_regions %>% 
+              select(-region),
+            by = "zip")
 
 ## -----------------------------------------------------------------------------
-c(1, 2, 5, 7, 8, 9) %>%
+c("1", "2", "3alt", "5", "7", "8", "9") %>%
   purrr::map(~ write_tworegion_data(iter = iter,
                                     comparison_region = .x,
                                     df = iter_data))
 
 
 ## -----------------------------------------------------------------------------
-c(1, 2, 5, 7, 8, 9) %>%
+c("1", "2", "3alt", "5", "7", "8", "9") %>%
   purrr::map(~ iter_data %>%
-               filter(region %in% c(3, .x)) %>%
+               filter(region %in% c("3", .x)) %>%
                select(full_reg, sire_reg, dam_reg) %>%
                three_gen(full_ped = ped) %>%
                write_delim(here::here(glue("data/derived_data/gibbs_varcomp/iter{iter}/3v{.x}/ped.txt")),

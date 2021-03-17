@@ -2,7 +2,7 @@ post_gibbs_path: '/usr/local/bin/postgibbsf90'
 
 iter: ['1', '2', '3', '4', '5']
 
-dataset: ['3v1', '3v2', '3v5', '3v7', '3v8', '3v9']
+dataset: ['3v1', '3v2', '3v3alt', '3v5', '3v7', '3v8', '3v9']
 
 post_gibbs_burnin: "50000"
 

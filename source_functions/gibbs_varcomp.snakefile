@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=100 -j 20 --config --until gibbs &> log/snakemake_log/gibbs_varcomp/210209.gibbs_varcomp.log &
+# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=100 -j 20 --config --until gibbs &> log/snakemake_log/gibbs_varcomp/210317.gibbs_varcomp.log &
 
 import os
 
@@ -13,7 +13,7 @@ configfile: "source_functions/config/gibbs_varcomp.config.yaml"
 
 rule all:
     input:
-     expand("data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/{file}", iter = config['iter'], dataset = config['dataset'], file = ["postout", "postmean"])
+     expand("data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/gibbs.iter{iter}.{dataset}.out", iter = config['iter'], dataset = config['dataset'])
 
 # Create sample datasets
 rule sample:
@@ -85,24 +85,3 @@ rule gibbs:
         cp last_solutions last_solutions_backup
         echo "done" > dummy.txt
         """
-
-rule post_gibbs:
-    resources:
-        load = 10
-    input:
-        dummy = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/dummy.txt"
-    params:
-        directory = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}",
-    output:
-        postout = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/postout",
-        postmean = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/postmean"
-    # All integer arguments need to be strings in yaml config file in order to run
-    run:
-        import pexpect
-        child = pexpect.spawn(config['post_gibbs_path'] + ' renf90.par', cwd = params.directory)
-        child.expect('Burn-in?')
-        child.sendline(config['post_gibbs_burnin'])
-        child.expect('Give n to read')
-        child.sendline(config['post_gibbs_thin'])
-        child.expect('Choose a graph for samples')
-        child.sendline('0')
