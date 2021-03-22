@@ -209,7 +209,8 @@ pivot_hpd <-
 gibbs_h2 %>% 
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>% 
-  select(Comparison = key, Iteration = iter, everything(), -n_samples) %>%
+  mutate(key = if_else(key == "High Plains", "High Plains (anchor)", key)) %>% 
+  select(Comparison = key, Iteration = iter, everything(), -n_samples, -dataset) %>%
   arrange(Comparison, Iteration)
 ```
 

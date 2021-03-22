@@ -189,7 +189,8 @@ read_gibbs_h2 <- function(iteration, dataset) {
                      descs = c(desc1, desc2),
                      mat = TRUE,
                      mpe = TRUE) %>% 
-    mutate(iter = iteration)
+    mutate(iter = iteration,
+           dataset = glue::glue("3v{dataset}"))
     
     return(varcov)
   }
