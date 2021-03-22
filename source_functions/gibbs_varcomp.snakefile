@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=100 -j 20 --config --until gibbs &> log/snakemake_log/gibbs_varcomp/210317.gibbs_varcomp.log &
+# nohup snakemake -s source_functions/gibbs_varcomp.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --latency-wait 90 --resources load=180 -j 20 --config &> log/snakemake_log/gibbs_varcomp/210322.gibbs_varcomp.log &
 
 import os
 
@@ -44,7 +44,7 @@ rule copy_par:
 
 rule renf90:
     resources:
-        load = 20
+        load = 10
     input:
         par = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/gibbs_varcomp.par",
         datafile = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/data.txt",
@@ -64,7 +64,7 @@ rule renf90:
 
 rule gibbs:
     resources:
-        load = 5
+        load = 10
     input:
         renum_par = "data/derived_data/gibbs_varcomp/iter{iter}/{dataset}/renf90.par"
     params:

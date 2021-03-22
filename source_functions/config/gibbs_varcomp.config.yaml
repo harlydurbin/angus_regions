@@ -6,7 +6,7 @@ gibbs_path: '/usr/local/bin/thrgibbs1f90'
 
 post_gibbs_path: '/usr/local/bin/postgibbsf90'
 
-iter: ['1', '2', '3', '4', '5']
+iter: ['6', '7', '8', '9', '10']
 
 sample_limit: "50000"
 

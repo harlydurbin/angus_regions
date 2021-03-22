@@ -17,8 +17,8 @@ biv_heritability <-
       # Takes the "long" output of melt_aireml
       # One row for each variance or covariance
       df %>%
-      mutate(key = case_when(stringr::str_detect(val1, r1_abbrv) ~ r1_desc,
-                             stringr::str_detect(val1, r2_abbrv) ~ r2_desc),
+      mutate(key = case_when(stringr::str_detect(val1, glue::glue("^{r1_abbrv}_")) ~ r1_desc,
+                             stringr::str_detect(val1, glue::glue("^{r2_abbrv}_")) ~ r2_desc),
              # Direct/maternal covariance
              # If val1 is dir & val2 is mat, rename val1 to dir_mat
              val1 = case_when(val1 == glue::glue("{r1_abbrv}_dir") &

@@ -88,7 +88,10 @@ read_gibbs_corr <- function(iteration, dataset) {
                          n_max = 4,
                          col_names = FALSE) %>% 
       janitor::remove_empty(which = c("rows", "cols")) %>% 
-      purrr::set_names("3_dir", glue("{dataset}_dir"), "3_mat", glue("{dataset}_mat"))
+      purrr::set_names("3_dir",
+                       glue("{dataset}_dir"),
+                       "3_mat",
+                       glue("{dataset}_mat"))
     
     corrmat %>%
       tibble::as.tibble() %>% 
@@ -97,7 +100,8 @@ read_gibbs_corr <- function(iteration, dataset) {
                           names_to = "val2",
                           values_to = "corr") %>% 
       dplyr::filter(!is.na(corr)) %>% 
-      dplyr::mutate(iter = iteration)
+      dplyr::mutate(iter = iteration,
+                    dataset = glue::glue("3v{dataset}"))
   
   }
 }
@@ -114,7 +118,10 @@ read_gibbs_varcov <- function(iteration, dataset) {
                   n_max = 4,
                   col_names = FALSE) %>% 
       janitor::remove_empty(which = c("rows", "cols")) %>% 
-      purrr::set_names("3_dir", glue("{dataset}_dir"), "3_mat", glue("{dataset}_mat")) %>% 
+      purrr::set_names("3_dir",
+                       glue("{dataset}_dir"),
+                       "3_mat",
+                       glue("{dataset}_mat")) %>% 
       dplyr::mutate(val1 = colnames(.)) %>%
       tidyr::pivot_longer(-val1,
                           names_to = "val2",
@@ -126,11 +133,13 @@ read_gibbs_varcov <- function(iteration, dataset) {
                   n_max = 2,
                   col_names = FALSE) %>% 
       janitor::remove_empty(which = c("rows", "cols")) %>% 
-      purrr::set_names("3_mpe", glue("{dataset}_mpe")) %>% 
+      purrr::set_names("3_mpe",
+                       glue("{dataset}_mpe")) %>% 
       dplyr::mutate(val1 = colnames(.)) %>%
       tidyr::pivot_longer(-val1,
                           names_to = "val2",
                           values_to = "var_cov")
+      
     
     r_cov <-
       read_table2(here::here(fp),
@@ -138,7 +147,8 @@ read_gibbs_varcov <- function(iteration, dataset) {
                   n_max = 2,
                   col_names = FALSE) %>% 
       janitor::remove_empty(which = c("rows", "cols")) %>% 
-      purrr::set_names("3_res", glue("{dataset}_res")) %>% 
+      purrr::set_names("3_res",
+                       glue("{dataset}_res")) %>% 
       dplyr::mutate(val1 = colnames(.)) %>%
       tidyr::pivot_longer(-val1,
                           names_to = "val2",
@@ -147,7 +157,8 @@ read_gibbs_varcov <- function(iteration, dataset) {
     dplyr::bind_rows(g_cov,
                      mpe_cov,
                      r_cov) %>% 
-      dplyr::mutate(iter = iteration)
+      dplyr::mutate(iter = iteration,
+                    dataset = glue::glue("3v{dataset}"))
     
   }
 }
@@ -160,13 +171,17 @@ read_gibbs_h2 <- function(iteration, dataset) {
   desc1 <- "High Plains"
   
   desc2 <- 
-    region_key %>% 
-    filter(num == dataset) %>% 
-    pull(desc)
+    if(dataset == "3alt") {
+      "High Plains (control)"
+    } else {
+      region_key %>% 
+        filter(num == as.numeric(dataset)) %>% 
+        pull(desc)
+    }
   
   varcov <-
     read_gibbs_varcov(iteration = iteration, 
-                    dataset = dataset) 
+                      dataset = dataset) 
   
   if(!is.null(varcov)){
     varcov %<>% 

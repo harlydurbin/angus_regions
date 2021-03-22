@@ -23,7 +23,7 @@ library(stringr)
 library(rlang)
 library(coda)
 
-complete_samples <- 9500
+complete_samples <- 0
 
 source(here::here("source_functions/calculate_heritability.R"))
 source(here::here("source_functions/read_gibbs.R"))
@@ -38,8 +38,8 @@ source(here::here("source_functions/region_key.R"))
 ```{r, message= FALSE, warning=FALSE}
 gibbs_samples <-
   purrr::map2_dfr(.x = rep(c(1:5), 
-                           times = 6),
-                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 7),
+                  .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
                            times = 5),
                   ~ read_gibbs_samples(iteration = .x,
                                  region = .y)) %>% 
@@ -78,35 +78,32 @@ n_samples <-
 ```{r, warning=FALSE, message=FALSE}
 gibbs_varcomp <-
   purrr::map2_dfr(.x = rep(c(1:5), 
-                           times = 6),
-                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times =7),
+                  .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
                            times = 5),
                   ~ read_gibbs_varcov(iteration = .x,
-                                      dataset = .y) %>% 
-                    mutate(dataset = glue("3v{.y}")))
+                                      dataset = .y))
   
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 gibbs_corr <-
   purrr::map2_dfr(.x = rep(c(1:5), 
-                           times = 6),
-                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 7),
+                  .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
                            times = 5),
                   ~ read_gibbs_corr(iteration = .x,
-                                    dataset = .y) %>% 
-                    mutate(dataset = glue("3v{.y}")))
+                                    dataset = .y))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 gibbs_h2 <-
   purrr::map2_dfr(.x = rep(c(1:5), 
-                           times = 6),
-                  .y = rep(c(1, 2, 5, 7, 8, 9),
+                           times = 7),
+                  .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
                            times = 5),
                   ~ read_gibbs_h2(iteration = .x,
-                                  dataset = .y) %>% 
-                    mutate(dataset = glue("3v{.y}"))) 
+                                  dataset = .y)) 
 ```
 
 ```{r}
@@ -216,7 +213,7 @@ gibbs_h2 %>%
   arrange(Comparison, Iteration)
 ```
 
-## $h^2_D$
+## $$h^2_D$$
 
 ```{r}
 gibbs_h2 %>% 
@@ -230,7 +227,7 @@ gibbs_h2 %>%
 
 ### Distribution 
 
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=14, fig.height=8}
 plot_dist_grid(df = h2_sample, var = dir2h2)
 ```
 
@@ -240,7 +237,7 @@ plot_dist_grid(df = h2_sample, var = dir2h2)
 pivot_hpd("dir2h2")
 ```
 
-## $h^2_M$
+## $$h^2_M$$
 
 ```{r}
 gibbs_h2 %>% 
@@ -254,7 +251,7 @@ gibbs_h2 %>%
 
 ### Distribution 
 
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=14, fig.height=8}
 plot_dist_grid(df = h2_sample, var = mat2h2)
 ```
 
@@ -264,7 +261,7 @@ plot_dist_grid(df = h2_sample, var = mat2h2)
 pivot_hpd("mat2h2")
 ```
 
-## $c^2$
+## $$c^2$$
 
 ```{r}
 gibbs_h2 %>% 
@@ -278,7 +275,7 @@ gibbs_h2 %>%
 
 ### Distribution 
 
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=14, fig.height=8}
 plot_dist_grid(df = h2_sample, var = mpe2c2)
 ```
 
@@ -295,10 +292,11 @@ pivot_hpd("mpe2c2")
 ```{r}
 gibbs_corr %>% 
   filter(stringr::str_detect(val1, "3_dir")) %>% 
-  filter(stringr::str_detect(val2, "dir") & !stringr::str_detect(val2, "3")) %>% 
+  filter(stringr::str_detect(val2, "dir") & !stringr::str_detect(val2, "3_")) %>% 
   mutate(num = as.numeric(stringr::str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>% 
+  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>% 
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>% 
   select(Comparison = desc,
@@ -309,11 +307,12 @@ gibbs_corr %>%
 
 ```{r}
 gibbs_corr %>% 
-  filter(str_detect(val1, "3_dir")) %>% 
-  filter(str_detect(val2, "dir") & !str_detect(val2, "3")) %>% 
-  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  filter(stringr::str_detect(val1, "3_dir")) %>% 
+  filter(stringr::str_detect(val2, "dir") & !stringr::str_detect(val2, "3_")) %>% 
+  mutate(num = as.numeric(stringr::str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>% 
+  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>% 
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>% 
   select(Comparison = desc,
@@ -342,11 +341,12 @@ pivot_hpd("rgdir1dir2")
 
 ```{r}
 gibbs_corr %>% 
-  filter(str_detect(val1, "3_mat")) %>% 
-  filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
-  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  filter(stringr::str_detect(val1, "3_mat")) %>% 
+  filter(stringr::str_detect(val2, "mat") & !stringr::str_detect(val2, "3_")) %>% 
+  mutate(num = as.numeric(stringr::str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>% 
+  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>%
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>%
   select(Comparison = desc,
@@ -357,11 +357,12 @@ gibbs_corr %>%
 
 ```{r}
 gibbs_corr %>% 
-  filter(str_detect(val1, "3_mat")) %>% 
-  filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
-  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  filter(stringr::str_detect(val1, "3_mat")) %>% 
+  filter(stringr::str_detect(val2, "mat") & !stringr::str_detect(val2, "3_")) %>% 
+  mutate(num = as.numeric(stringr::str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
-              select(num, desc)) %>%
+              select(num, desc)) %>% 
+  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>%
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>%
   select(Comparison = desc,
@@ -391,10 +392,11 @@ pivot_hpd("rgmat1mat2")
 ```{r}
 gibbs_corr %>% 
   filter(str_detect(val1, "3_dir")) %>% 
-  filter(str_detect(val2, "mat") & !str_detect(val2, "3")) %>% 
+  filter(str_detect(val2, "mat") & !str_detect(val2, "3_")) %>% 
   mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>%
+  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>%
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>%
   select(Comparison = desc,
@@ -423,14 +425,15 @@ pivot_hpd("rgdir1mat2")
 
 ```{r}
 gibbs_corr %>% 
-  mutate(val1r = str_extract(val1, "^[[:digit:]]{1}"),
-         val2r = str_extract(val2, "^[[:digit:]]{1}")) %>% 
+  mutate(val1r = str_extract(val1, "^[[:alnum:]]+(?=_)"),
+         val2r = str_extract(val2, "^[[:alnum:]]+(?=_)")) %>% 
   filter(val1r == val2r) %>% 
   filter(str_detect(val1, "dir")) %>% 
   filter(str_detect(val2, "mat")) %>% 
   mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
   left_join(region_key %>% 
               select(num, desc)) %>%
+  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>%
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>%
   select(Comparison = desc,
@@ -456,3 +459,8 @@ pivot_hpd("rgdir2mat2")
 ```
 
 # Commentary
+
+```{r, eval=FALSE}
+pivot_hpd(which = "rgmat1mat2") %>% 
+  writexl::write_xlsx(here::here("test.xlsx"))
+```
