@@ -7,6 +7,8 @@ output:
     toc_float: true
     df_print: paged
     code_folding: hide
+params:
+  complete_samples: 9500
 ---
 
 ```{r, include=FALSE}
@@ -23,7 +25,7 @@ library(stringr)
 library(rlang)
 library(coda)
 
-complete_samples <- 0
+complete_samples <- params$complete_samples
 
 source(here::here("source_functions/calculate_heritability.R"))
 source(here::here("source_functions/read_gibbs.R"))
@@ -121,7 +123,8 @@ h2_sample <-
          dir2h2 = (dir2dir2/(dir2dir2+dir2mat2+mat2mat2+mpe2mpe2+res2res2)),
          mpe1c2 = (mpe1mpe1/(dir1dir1+dir1mat1+mat1mat1+mpe1mpe1+res1res1)),
          # mpe c2
-         mpe2c2 = (mpe2mpe2/(dir2dir2+dir2mat2+mat2mat2+mpe2mpe2+res2res2))) %>% 
+         mpe2c2 = (mpe2mpe2/(dir2dir2+dir2mat2+mat2mat2+mpe2mpe2+res2res2)),
+         iter = as.numeric(iter)) %>% 
   select(iter, dataset, round, mat1h2, mat2h2, dir1h2, dir2h2, mpe1c2, mpe2c2)
 ```
 
@@ -140,7 +143,8 @@ rg_sample <-
          rgdir1mat2 = (dir1mat2/(sqrt(dir1dir1*mat2mat2))),
          # dir-mat within region
          rgdir2mat2 = (dir2mat2/(sqrt(dir2dir2*mat2mat2))),
-         rgdir1mat1 = (dir1mat1/(sqrt(dir1dir1*mat1mat1)))) %>% 
+         rgdir1mat1 = (dir1mat1/(sqrt(dir1dir1*mat1mat1))),
+         iter = as.numeric(iter)) %>% 
   select(iter, dataset, round, starts_with("rg"))
 ```
 
@@ -214,7 +218,7 @@ gibbs_h2 %>%
   arrange(Comparison, Iteration)
 ```
 
-## $$h^2_D$$
+## $h^2_D$
 
 ```{r}
 gibbs_h2 %>% 
@@ -229,7 +233,10 @@ gibbs_h2 %>%
 ### Distribution 
 
 ```{r, fig.width=14, fig.height=8}
-plot_dist_grid(df = h2_sample, var = dir2h2)
+plot_dist_grid(df = h2_sample %>%
+                 left_join(n_samples) %>% 
+                 filter(n_samples >= complete_samples),
+               var = dir2h2)
 ```
 
 ### HPD interval
@@ -238,7 +245,7 @@ plot_dist_grid(df = h2_sample, var = dir2h2)
 pivot_hpd("dir2h2")
 ```
 
-## $$h^2_M$$
+## $h^2_M$
 
 ```{r}
 gibbs_h2 %>% 
@@ -253,7 +260,10 @@ gibbs_h2 %>%
 ### Distribution 
 
 ```{r, fig.width=14, fig.height=8}
-plot_dist_grid(df = h2_sample, var = mat2h2)
+plot_dist_grid(df = h2_sample %>%
+                 left_join(n_samples) %>% 
+                 filter(n_samples >= complete_samples),
+               var = mat2h2)
 ```
 
 ### HPD interval
@@ -262,7 +272,7 @@ plot_dist_grid(df = h2_sample, var = mat2h2)
 pivot_hpd("mat2h2")
 ```
 
-## $$c^2$$
+## $c^2$
 
 ```{r}
 gibbs_h2 %>% 
@@ -277,7 +287,10 @@ gibbs_h2 %>%
 ### Distribution 
 
 ```{r, fig.width=14, fig.height=8}
-plot_dist_grid(df = h2_sample, var = mpe2c2)
+plot_dist_grid(df = h2_sample %>%
+                 left_join(n_samples) %>% 
+                 filter(n_samples >= complete_samples),
+               var = mpe2c2)
 ```
 
 ### HPD interval
@@ -330,7 +343,10 @@ gibbs_corr %>%
 ### Distribution 
 
 ```{r, fig.width=12, fig.height=8}
-plot_dist_grid(df = rg_sample, var = rgdir1dir2)
+plot_dist_grid(df = rg_sample %>%
+                 left_join(n_samples) %>% 
+                 filter(n_samples >= complete_samples),
+               var = rgdir1dir2)
 ```
 
 ### HPD interval
@@ -381,7 +397,10 @@ gibbs_corr %>%
 ### Distribution 
 
 ```{r, fig.width=12, fig.height=8}
-plot_dist_grid(df = rg_sample, var = rgmat1mat2)
+plot_dist_grid(df = rg_sample %>%
+                 left_join(n_samples) %>% 
+                 filter(n_samples >= complete_samples),
+               var = rgmat1mat2)
 ```
 
 ### HPD interval
@@ -416,7 +435,10 @@ gibbs_corr %>%
 ### Distribution 
 
 ```{r, fig.width=12, fig.height=8}
-plot_dist_grid(df = rg_sample, var = rgdir1mat2)
+plot_dist_grid(df = rg_sample %>%
+                 left_join(n_samples) %>% 
+                 filter(n_samples >= complete_samples),
+               var = rgdir1mat2)
 ```
 
 ### HPD interval
@@ -454,7 +476,10 @@ gibbs_corr %>%
 ### Distribution 
 
 ```{r, fig.width=12, fig.height=8}
-plot_dist_grid(df = rg_sample, var = rgdir2mat2)
+plot_dist_grid(df = rg_sample %>%
+                 left_join(n_samples) %>% 
+                 filter(n_samples >= complete_samples),
+               var = rgdir2mat2)
 ```
 
 ### HPD interval

@@ -65,10 +65,10 @@ $$z = \frac{\theta_a-\theta_b}{\sqrt{Var(\theta_a)+Var(\theta_b)}} $$
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_samples <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
+  purrr::map2_dfr(.x = rep(c(1:10), 
                            times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
-                           times = 5),
+                           times = 10),
                   ~ read_gibbs_samples(iteration = .x,
                                  region = .y)) %>% 
   select(iter, dataset, everything(), -X1, -X3) %>% 
@@ -95,10 +95,10 @@ gibbs_samples <-
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_mce <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
+  purrr::map2_dfr(.x = rep(c(1:10), 
                            times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
-                           times = 5),
+                           times = 10),
                   ~ read_gibbs_mce(iteration = .x,
                                    region = .y)) %>%
   left_join(gibbs_samples %>% 
@@ -110,10 +110,10 @@ gibbs_mce <-
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_psd <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
+  purrr::map2_dfr(.x = rep(c(1:10), 
                            times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
-                           times = 5),
+                           times = 10),
                   ~ read_gibbs_psd(iteration = .x,
                                  region = .y)) %>%
   left_join(gibbs_samples %>% 
@@ -201,14 +201,14 @@ plot_gibbs_region <-
       labs(x = "Round", 
            y = "Value",
            color = "Parameter") +
-      facet_wrap(~ iter, ncol = 1)
+      facet_wrap(~ iter, ncol = 2)
   }
   
 ```
 
 ## Desert
 
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=16, fig.height=12}
 gibbs_samples %>% 
   filter(dataset == "3v1") %>% 
   plot_gibbs_region()
@@ -216,7 +216,7 @@ gibbs_samples %>%
 
 ## Southeast
 
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=16, fig.height=12}
 gibbs_samples %>% 
   filter(dataset == "3v2") %>% 
   plot_gibbs_region()
@@ -224,7 +224,7 @@ gibbs_samples %>%
 
 ## High Plains, control
 
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=16, fig.height=12}
 gibbs_samples %>% 
   filter(dataset == "3v3alt") %>% 
   plot_gibbs_region()
@@ -232,7 +232,7 @@ gibbs_samples %>%
 
 ## Arid Prairie
 
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=16, fig.height=12}
 gibbs_samples %>% 
   filter(dataset == "3v5") %>% 
   plot_gibbs_region()
@@ -240,7 +240,7 @@ gibbs_samples %>%
 
 ## Forested Mountains
 
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=16, fig.height=12}
 gibbs_samples %>% 
   filter(dataset == "3v7") %>% 
   plot_gibbs_region()
@@ -248,7 +248,7 @@ gibbs_samples %>%
 
 ## Fescue Belt
 
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=16, fig.height=12}
 gibbs_samples %>% 
   filter(dataset == "3v8") %>% 
   plot_gibbs_region()
@@ -256,7 +256,7 @@ gibbs_samples %>%
 
 ## Upper Midwest & Northeast
 
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=16, fig.height=12}
 gibbs_samples %>% 
   filter(dataset == "3v9") %>% 
   plot_gibbs_region()
