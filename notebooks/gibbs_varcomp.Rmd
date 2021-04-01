@@ -37,10 +37,10 @@ source(here::here("source_functions/region_key.R"))
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_samples <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
+  purrr::map2_dfr(.x = rep(c(1:10), 
                            times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
-                           times = 5),
+                           times = 10),
                   ~ read_gibbs_samples(iteration = .x,
                                  region = .y)) %>% 
   select(iter, dataset, everything(), -X1, -X3) %>% 
@@ -77,10 +77,10 @@ n_samples <-
 
 ```{r, warning=FALSE, message=FALSE}
 gibbs_varcomp <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
-                           times =7),
+  purrr::map2_dfr(.x = rep(c(1:10), 
+                           times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
-                           times = 5),
+                           times = 10),
                   ~ read_gibbs_varcov(iteration = .x,
                                       dataset = .y))
   
@@ -88,20 +88,20 @@ gibbs_varcomp <-
 
 ```{r, warning=FALSE, message=FALSE}
 gibbs_corr <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
+  purrr::map2_dfr(.x = rep(c(1:10), 
                            times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
-                           times = 5),
+                           times = 10),
                   ~ read_gibbs_corr(iteration = .x,
                                     dataset = .y))
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 gibbs_h2 <-
-  purrr::map2_dfr(.x = rep(c(1:5), 
+  purrr::map2_dfr(.x = rep(c(1:10), 
                            times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
-                           times = 5),
+                           times = 10),
                   ~ read_gibbs_h2(iteration = .x,
                                   dataset = .y)) 
 ```
@@ -323,7 +323,8 @@ gibbs_corr %>%
   summarise(`Min.` = min(Correlation),
             Mean = mean(Correlation),
             `Max.` = max(Correlation),
-            SD = sd(Correlation))
+            SD = sd(Correlation),
+            n = n_distinct(Iteration))
 ```
 
 ### Distribution 
@@ -373,7 +374,8 @@ gibbs_corr %>%
   summarise(`Min.` = min(Correlation),
             Mean = mean(Correlation),
             `Max.` = max(Correlation),
-            SD = sd(Correlation))
+            SD = sd(Correlation),
+            n = n_distinct(Iteration))
 ```
 
 ### Distribution 
@@ -407,7 +409,8 @@ gibbs_corr %>%
   summarise(`Min.` = min(Correlation),
             Mean = mean(Correlation),
             `Max.` = max(Correlation),
-            SD = sd(Correlation))
+            SD = sd(Correlation),
+            n = n_distinct(Iteration))
 ```
 
 ### Distribution 
@@ -444,7 +447,8 @@ gibbs_corr %>%
   summarise(`Min.` = min(Correlation),
             Mean = mean(Correlation),
             `Max.` = max(Correlation),
-            SD = sd(Correlation))
+            SD = sd(Correlation),
+            n = n_distinct(Iteration))
 ```
 
 ### Distribution 
