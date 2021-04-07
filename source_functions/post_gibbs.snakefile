@@ -1,4 +1,4 @@
-# nohup snakemake -s source_functions/post_gibbs.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --keep-going --resources load=50 --config &> log/snakemake_log/post_gibbs/210401.post_gibbs.log &
+# nohup snakemake -s source_functions/post_gibbs.snakefile --directory /home/agiintern/angus_regions --rerun-incomplete --keep-going --resources load=50 --config &> log/snakemake_log/post_gibbs/210407.post_gibbs.log &
 
 configfile: "source_functions/config/post_gibbs.config.yaml"
 
