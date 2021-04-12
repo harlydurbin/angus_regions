@@ -8,7 +8,7 @@ output:
     df_print: paged
     code_folding: hide
 params:
-  complete_samples: 6000
+  complete_samples: 9500
 ---
 
 ```{r, include=FALSE}
