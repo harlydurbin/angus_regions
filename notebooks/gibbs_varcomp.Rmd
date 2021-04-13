@@ -35,6 +35,18 @@ source(here::here("source_functions/region_key.R"))
 
 # Notes & questions
 
+* Plotted distributions of heritabilities/genetic correlations represent the distribution of 9,500 sample-by-sample estimates
+* Highest posterior density intervals calculated with `{coda}` package based on distribution of the 9,500 sample-by-sample heritability or genetic correlation estimates
+
+---
+
+*Overview of conclusions/questions:*
+
+* High Plains "control" $r_g$ estimates aren't much higher than most of the other comparison region estimates
+* How much of our results can we safely are a result of GxE vs. pedigree relatedness between samples?
+    + Does it matter? Are the conclusions the same?
+* I'm still convinced that GxE matters in some parts of the U.S., I'm just not sure if the magnitude of the effect is as large as we previously thought/it's not as straight forward as we thought
+
 # Setup 
 
 ```{r, message= FALSE, warning=FALSE}
@@ -154,7 +166,10 @@ plot_dist_grid <-
     var <- rlang::enquo(var)
     
     df %>% 
+      mutate(iter = as.numeric(iter)) %>% 
+      arrange(iter) %>% 
       mutate(iter = glue("Iteration {iter}"),
+             iter = forcats::fct_inorder(as.factor(iter)),
              num = as.numeric(str_extract(dataset, "(?<=3v)[[:digit:]]"))) %>% 
       left_join(region_key) %>% 
       ggplot(aes(x = !!var,
@@ -209,19 +224,25 @@ pivot_hpd <-
 
 # Heritabilities
 
+## All heritabilities, all comparisons, all iterations
+
 ```{r}
 gibbs_h2 %>% 
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>% 
   mutate(key = if_else(key == "High Plains", "High Plains (anchor)", key)) %>% 
   select(Comparison = key, Iteration = iter, everything(), -n_samples, -dataset) %>%
-  arrange(Comparison, Iteration)
+  arrange(Comparison, Iteration) %>% 
+  DT::datatable()
 ```
 
-## $h^2_D$
+## Weaning weight direct $h^2_D$
+
+### Summarized by comparison across iterations
 
 ```{r}
 gibbs_h2 %>% 
+  mutate(key = if_else(key == "High Plains", "High Plains (anchor)", key)) %>% 
   group_by(key) %>% 
   summarise(`Min h2D` = min(`Direct h2`),
             `Mean h2D` = mean(`Direct h2`),
@@ -245,10 +266,15 @@ plot_dist_grid(df = h2_sample %>%
 pivot_hpd("dir2h2")
 ```
 
-## $h^2_M$
+## Weaning weight maternal $h^2_M$
+
+### Summarized by comparison across iterations
+
+* Maybe interesting that Southeast tends to have higher $h^2_M$. Same result using previous strategy
 
 ```{r}
 gibbs_h2 %>% 
+  mutate(key = if_else(key == "High Plains", "High Plains (anchor)", key)) %>% 
   group_by(key) %>% 
   summarise(`Min h2M` = min(`Maternal h2`),
             `Mean h2M` = mean(`Maternal h2`),
@@ -272,10 +298,16 @@ plot_dist_grid(df = h2_sample %>%
 pivot_hpd("mat2h2")
 ```
 
-## $c^2$
+## Maternal permanent environment $c^2$
+
+### Summarized by comparison across iterations
+
+* Again, note larger $c^2$ estimate for Southeast & Fescue Belt as seen in previous results
+    + Made me think of hair shedding result where the PE estimate was higher on fescue than off fescue
 
 ```{r}
 gibbs_h2 %>% 
+  mutate(key = if_else(key == "High Plains", "High Plains (anchor)", key)) %>% 
   group_by(key) %>% 
   summarise(`Min c2` = min(`MPE c2`),
             `Mean c2` = mean(`MPE c2`),
@@ -301,7 +333,9 @@ pivot_hpd("mpe2c2")
 
 # Genetic correlations
 
-## HP direct & other direct
+## High Plains direct & comparison region direct
+
+### All comparisons, all iterations
 
 ```{r}
 gibbs_corr %>% 
@@ -313,11 +347,17 @@ gibbs_corr %>%
   mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>% 
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>% 
-  select(Comparison = desc,
+  select(key = desc,
          Iteration = iter,
          Correlation = corr) %>% 
-  arrange(Comparison, Iteration)
+  arrange(key, Iteration) %>% 
+  DT::datatable()
 ```
+
+### Summarized by comparison across iterations 
+
+* The mean here for most regions is lower than the previous estimate
+* Somewhat disconcerting that the High Plains control vs. High Plains "anchor" isn't the highest estimate (or at least, that it's as low as it is) 
 
 ```{r}
 gibbs_corr %>% 
@@ -337,7 +377,7 @@ gibbs_corr %>%
             Mean = mean(Correlation),
             `Max.` = max(Correlation),
             SD = sd(Correlation),
-            n = n_distinct(Iteration))
+            n = n())
 ```
 
 ### Distribution 
@@ -355,7 +395,9 @@ plot_dist_grid(df = rg_sample %>%
 pivot_hpd("rgdir1dir2")
 ```
 
-## HP maternal & other maternal
+## High Plains maternal & comparison region maternal
+
+### All comparisons, all iterations
 
 ```{r}
 gibbs_corr %>% 
@@ -370,8 +412,14 @@ gibbs_corr %>%
   select(Comparison = desc,
          Iteration = iter,
          Correlation = corr) %>% 
-  arrange(Comparison, Iteration)
+  arrange(Comparison, Iteration) %>% 
+  DT::datatable()
 ```
+
+### Summarized by comparison across iterations
+
+* Again, much lower than previous estimates for most regions. 
+* Below 0.8 even in the High Plains control
 
 ```{r}
 gibbs_corr %>% 
@@ -409,7 +457,28 @@ plot_dist_grid(df = rg_sample %>%
 pivot_hpd("rgmat1mat2")
 ```
 
-## HP direct & other maternal
+## High Plains direct & comparison region maternal
+
+### All comparisons, all iterations
+
+```{r}
+gibbs_corr %>% 
+  filter(stringr::str_detect(val1, "3_dir")) %>% 
+  filter(stringr::str_detect(val2, "mat") & !stringr::str_detect(val2, "3_")) %>% 
+  mutate(num = as.numeric(stringr::str_extract(val2, "[1-9]"))) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>% 
+  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>%
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>%
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  arrange(Comparison, Iteration) %>% 
+  DT::datatable()
+```
+
+### Summarized by comparison across iterations
 
 ```{r}
 gibbs_corr %>% 
@@ -449,17 +518,45 @@ pivot_hpd("rgdir1mat2")
 
 ## Within-region direct & maternal
 
+### All comparisons, all iterations
+
 ```{r}
 gibbs_corr %>% 
-  mutate(val1r = str_extract(val1, "^[[:alnum:]]+(?=_)"),
-         val2r = str_extract(val2, "^[[:alnum:]]+(?=_)")) %>% 
-  filter(val1r == val2r) %>% 
-  filter(str_detect(val1, "dir")) %>% 
-  filter(str_detect(val2, "mat")) %>% 
-  mutate(num = as.numeric(str_extract(val2, "[1-9]"))) %>% 
+  mutate(r1 = stringr::str_extract(val1, "[[:alnum:]]+(?=_)"),
+         r2 = stringr::str_extract(val2, "[[:alnum:]]+(?=_)")) %>% 
+  filter(r1 == r2) %>% 
+  filter(stringr::str_detect(val1, "dir")) %>% 
+  filter(stringr::str_detect(val2, "mat")) %>% 
+  mutate(num = as.numeric(r1)) %>% 
   left_join(region_key %>% 
-              select(num, desc)) %>%
-  mutate(desc = if_else(dataset == "3v3alt", "High Plains (control)", desc)) %>%
+              select(num, desc)) %>% 
+  mutate(desc = case_when(is.na(desc) & stringr::str_detect(dataset, "3alt") ~ "High Plains (control)",
+                          desc == "High Plains" ~ "High Plains (anchor)",
+                          TRUE ~ desc)) %>%
+  left_join(n_samples) %>% 
+  filter(n_samples >= complete_samples) %>%
+  select(Comparison = desc,
+         Iteration = iter,
+         Correlation = corr) %>% 
+  arrange(Comparison, Iteration) %>% 
+  DT::datatable()
+```
+
+### Summarized by comparison across iterations
+
+```{r}
+gibbs_corr %>% 
+  mutate(r1 = stringr::str_extract(val1, "[[:alnum:]]+(?=_)"),
+         r2 = stringr::str_extract(val2, "[[:alnum:]]+(?=_)")) %>% 
+  filter(r1 == r2) %>% 
+  filter(stringr::str_detect(val1, "dir")) %>% 
+  filter(stringr::str_detect(val2, "mat")) %>% 
+  mutate(num = as.numeric(r1)) %>% 
+  left_join(region_key %>% 
+              select(num, desc)) %>% 
+  mutate(desc = case_when(is.na(desc) & stringr::str_detect(dataset, "3alt") ~ "High Plains (control)",
+                          desc == "High Plains" ~ "High Plains (anchor)",
+                          TRUE ~ desc)) %>%
   left_join(n_samples) %>% 
   filter(n_samples >= complete_samples) %>%
   select(Comparison = desc,
@@ -470,7 +567,7 @@ gibbs_corr %>%
             Mean = mean(Correlation),
             `Max.` = max(Correlation),
             SD = sd(Correlation),
-            n = n_distinct(Iteration))
+            n = n())
 ```
 
 ### Distribution 
@@ -486,11 +583,4 @@ plot_dist_grid(df = rg_sample %>%
 
 ```{r}
 pivot_hpd("rgdir2mat2")
-```
-
-# Commentary
-
-```{r, eval=FALSE}
-pivot_hpd(which = "rgmat1mat2") %>% 
-  writexl::write_xlsx(here::here("test.xlsx"))
 ```
