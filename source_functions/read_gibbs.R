@@ -1,12 +1,16 @@
 read_gibbs_samples <- function(iteration, region) {
   
+  # String for file path of postgibbs_samples file
   fp <- glue::glue("data/derived_data/gibbs_varcomp/iter{iteration}/3v{region}/postgibbs_samples")
   
+  # If file path exists...
   if (file.exists(here::here(fp))) {
     
     readr::read_table2(here::here(fp),
                        col_names = FALSE) %>% 
+      # Remove empty rows and columns
       janitor::remove_empty(which = c("rows", "cols")) %>% 
+      # Create iteration and dataset columns
       dplyr::mutate(iter = iteration,
                     dataset = glue::glue("3v{region}"))
   }

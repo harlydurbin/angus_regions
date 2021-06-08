@@ -42,16 +42,22 @@ From [here:](https://masuday.github.io/blupf90_tutorial/vc_gs.html#generated-fil
 
 ```{r, message= FALSE, warning=FALSE}
 gibbs_samples <-
+  # Read gibbs_samples files for 10 iterations within all 7 analyses
+  # See read_gibbs.R for read_gibbs_samples() function
   purrr::map2_dfr(.x = rep(c(1:10), 
                            times = 7),
                   .y = rep(c("1", "2", "3alt", "5", "7", "8", "9"),
                            times = 10),
                   ~ read_gibbs_samples(iteration = .x,
                                  region = .y)) %>% 
+  # Honestly can't remember what's in columns 1 & 3 but remove them
   select(iter, dataset, everything(), -X1, -X3) %>% 
+  # Name columns: first column called "iter", second called "dataset", third called "round", last 14 called 1-14
   purrr::set_names("iter", "dataset", "round", c(1:14)) %>% 
+  # Convert dataframe to "long" format by transforming last 14 columns to 2 columns called "param" and "value" where "param" contains the parameter name (you'll have to figure out which is which yourself) and "value" contains the estimate corresponding to that parameter
   tidyr::pivot_longer(cols = c(`1`:`14`),
-                      names_to = "param") %>% 
+                      names_to = "param",
+                      values_to = "value") %>% 
   mutate(param = case_when(param == "1" ~ "dir1dir1",
                            param == "2" ~ "dir1dir2",
                            param == "3" ~ "dir1mat1",
@@ -138,6 +144,7 @@ plot_gibbs_iter <-
 plot_gibbs_region <- 
   function(df) {
     df %>% 
+      # Don't plot residuals or maternal permanent environment estimates
       filter(!stringr::str_detect(param, "res|mpe")) %>% 
       mutate(iter = as.numeric(iter)) %>% 
       arrange(iter) %>% 
